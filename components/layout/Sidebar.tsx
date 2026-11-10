@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Map,
+  MapPin,
   GitBranch,
   Box,
   Layers,
@@ -27,6 +28,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: 'Inicio', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Mapa de red', href: '/mapa', icon: Map },
+  { name: 'Zonas de red', href: '/zonas', icon: MapPin, badge: 4 },
   { name: 'Troncales', href: '/troncales', icon: GitBranch, badge: 7 },
   { name: 'Cajas NAP', href: '/naps', icon: Box, badge: 12 },
   { name: 'Mufas', href: '/mufas', icon: Layers, badge: 28 },
@@ -59,6 +61,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 className={cn(
                   'flex items-center justify-between px-[14px] py-[10px] rounded-[8px] text-[14px] transition-all duration-150',
                   isActive

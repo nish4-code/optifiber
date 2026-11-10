@@ -103,6 +103,7 @@ export function LatestCustomersTable({
                 <td className="py-[12px] px-[16px] text-right">
                   <Link
                     href={`/clientes?id=${c.id}`}
+                    prefetch={false}
                     className="text-[#0066ff] hover:text-[#0052cc] font-medium transition-colors"
                   >
                     Detalle
