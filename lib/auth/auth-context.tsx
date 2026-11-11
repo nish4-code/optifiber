@@ -17,11 +17,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return !!localStorage.getItem('optifiber_token');
+  });
   const router = useRouter();
 
   useEffect(() => {
     let isMounted = true;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('optifiber_token') : null;
+
+    if (!token) return;
+
     apiClient<{ user: User }>('/auth/me')
       .then((data) => {
         if (isMounted) setUser(data.user);
