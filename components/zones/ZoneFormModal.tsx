@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, MapPin, Locate, Check, AlertCircle } from 'lucide-react';
+import { MapPin, Locate, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { SlideOverDrawer } from '@/components/ui/SlideOverDrawer';
 import { apiClient } from '@/lib/api/client';
 import type { MapZone } from '@/types/map';
 
@@ -29,8 +30,6 @@ export const ZoneFormModal: React.FC<ZoneFormModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [geoLocating, setGeoLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
 
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
@@ -58,166 +57,165 @@ export const ZoneFormModal: React.FC<ZoneFormModalProps> = ({
     setError(null);
 
     if (!code.trim() || !name.trim()) {
-      setError('El código y nombre de zona son obligatorios.');
+      setError('El código y nombre son obligatorios.');
       return;
     }
 
     setSaving(true);
     try {
+      const payload = {
+        code,
+        name,
+        description,
+        center_lat: centerLat,
+        center_lng: centerLng,
+      };
+
       if (zoneToEdit) {
         await apiClient(`/zones/${zoneToEdit.id}`, {
           method: 'PUT',
-          body: JSON.stringify({
-            name,
-            description,
-            center_lat: centerLat,
-            center_lng: centerLng,
-          }),
+          body: JSON.stringify(payload),
         });
       } else {
         await apiClient('/zones', {
           method: 'POST',
-          body: JSON.stringify({
-            code,
-            name,
-            description,
-            center_lat: centerLat,
-            center_lng: centerLng,
-          }),
+          body: JSON.stringify(payload),
         });
       }
+
       onSaved();
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error guardando zona.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Ocurrió un error al guardar la zona.');
+      }
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0f172a]/40 backdrop-blur-xs flex items-center justify-center p-[16px] animate-in fade-in duration-200">
-      <div className="bg-white rounded-[12px] border border-[#e2e8f0] shadow-xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="px-[20px] py-[16px] border-b border-[#f1f5f9] flex items-center justify-between bg-[#f8fafc]">
-          <div className="flex items-center gap-[10px]">
-            <div className="w-[36px] h-[36px] rounded-[8px] bg-[#0066ff]/10 text-[#0066ff] flex items-center justify-center">
-              <MapPin size={20} />
-            </div>
-            <div>
-              <h2 className="text-[16px] font-bold text-[#0f172a]">
-                {zoneToEdit ? `Editar Zona ${zoneToEdit.code}` : 'Nueva Zona / Sector FTTH'}
-              </h2>
-              <p className="text-[12px] text-[#64748b]">
-                Delimitación geográfica y centro de mapa en WGS84.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-[32px] h-[32px] rounded-[6px] hover:bg-[#e2e8f0] flex items-center justify-center text-[#64748b] cursor-pointer"
+    <SlideOverDrawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title={zoneToEdit ? `Editar Zona ${zoneToEdit.code}` : 'Nueva Zona de Cobertura'}
+      subtitle="Definición de distrito, cuadrante y coordenadas de centrado GIS."
+      icon={<MapPin size={20} />}
+      maxWidth="md"
+      footer={
+        <>
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={saving}
+            className="gap-[6px]"
+            onClick={() => {
+              const form = document.getElementById('zone-form') as HTMLFormElement;
+              if (form) form.requestSubmit();
+            }}
           >
-            <X size={18} />
-          </button>
-        </div>
+            <Check size={14} />
+            {saving ? 'Guardando...' : zoneToEdit ? 'Actualizar Zona' : 'Crear Zona'}
+          </Button>
+        </>
+      }
+    >
+      <form id="zone-form" onSubmit={handleSubmit} className="flex flex-col gap-[14px]">
+        {error && (
+          <div className="p-[12px] rounded-[8px] bg-[#fef2f2] border border-[#fecaca] text-[#991b1b] text-[13px] flex items-center gap-[8px]">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="p-[20px] flex flex-col gap-[14px] overflow-y-auto">
-          {error && (
-            <div className="p-[12px] rounded-[8px] bg-[#fef2f2] border border-[#fecaca] text-[#991b1b] text-[13px] flex items-center gap-[8px]">
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-
+        <div className="grid grid-cols-2 gap-[12px]">
           <div>
             <label className="block text-[12px] font-semibold text-[#334155] mb-[6px]">
-              Código de Zona *
+              Código *
             </label>
             <Input
-              placeholder="ej. ZON-JLO"
+              placeholder="ej. ZON-01"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              disabled={!!zoneToEdit}
               required
             />
           </div>
 
           <div>
             <label className="block text-[12px] font-semibold text-[#334155] mb-[6px]">
-              Nombre de Zona o Ciudad *
+              Nombre de la Zona *
             </label>
             <Input
-              placeholder="ej. José Leonardo Ortiz — Sector Norte"
+              placeholder="ej. Distrito de Chiclayo"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-[12px] font-semibold text-[#334155] mb-[6px]">
-              Descripción / Cobertura
-            </label>
-            <Input
-              placeholder="ej. Sector urbano Chiclayo Norte"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
+        <div>
+          <label className="block text-[12px] font-semibold text-[#334155] mb-[6px]">
+            Descripción o Alcance
+          </label>
+          <textarea
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="ej. Cuadrante norte que comprende Parque Principal..."
+            className="w-full p-[10px] text-[13px] text-[#334155] bg-white border border-[#cbd5e1] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#0066ff]/20 focus:border-[#0066ff] transition-all resize-none"
+          />
+        </div>
 
-          <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] p-[12px] flex flex-col gap-[10px]">
-            <div className="flex items-center justify-between">
-              <span className="text-[12px] font-semibold text-[#1e293b]">
-                Coordenadas Centro del Mapa
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleGetLocation}
-                disabled={geoLocating}
-                className="text-[12px] text-[#0066ff] h-[28px] gap-[4px]"
-              >
-                <Locate size={12} />
-                {geoLocating ? 'Obteniendo...' : 'GPS Actual'}
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-[10px]">
-              <div>
-                <span className="block text-[11px] text-[#64748b] mb-[4px]">Latitud</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={centerLat}
-                  onChange={(e) => setCenterLat(parseFloat(e.target.value) || 0)}
-                  className="w-full h-[36px] px-[10px] text-[12px] font-mono bg-white border border-[#cbd5e1] rounded-[6px]"
-                  required
-                />
-              </div>
-              <div>
-                <span className="block text-[11px] text-[#64748b] mb-[4px]">Longitud</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={centerLng}
-                  onChange={(e) => setCenterLng(parseFloat(e.target.value) || 0)}
-                  className="w-full h-[36px] px-[10px] text-[12px] font-mono bg-white border border-[#cbd5e1] rounded-[6px]"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-[10px] border-t border-[#f1f5f9] flex justify-end gap-[10px]">
-            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={saving}>
-              Cancelar
-            </Button>
-            <Button type="submit" size="sm" disabled={saving} className="gap-[6px]">
-              <Check size={14} />
-              {saving ? 'Guardando...' : zoneToEdit ? 'Actualizar Zona' : 'Crear Zona'}
+        <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] p-[12px] flex flex-col gap-[10px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] font-semibold text-[#1e293b] flex items-center gap-[6px]">
+              <MapPin size={14} className="text-[#0066ff]" />
+              Coordenadas Centro del Mapa
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleGetLocation}
+              disabled={geoLocating}
+              className="text-[12px] text-[#0066ff] h-[28px] gap-[4px]"
+            >
+              <Locate size={12} />
+              {geoLocating ? 'Obteniendo...' : 'GPS Actual'}
             </Button>
           </div>
-        </form>
-      </div>
-    </div>
+          <div className="grid grid-cols-2 gap-[10px]">
+            <div>
+              <span className="block text-[11px] text-[#64748b] mb-[4px]">Latitud</span>
+              <input
+                type="number"
+                step="any"
+                value={centerLat}
+                onChange={(e) => setCenterLat(parseFloat(e.target.value) || 0)}
+                className="w-full h-[36px] px-[10px] text-[12px] font-mono bg-white border border-[#cbd5e1] rounded-[6px]"
+                required
+              />
+            </div>
+            <div>
+              <span className="block text-[11px] text-[#64748b] mb-[4px]">Longitud</span>
+              <input
+                type="number"
+                step="any"
+                value={centerLng}
+                onChange={(e) => setCenterLng(parseFloat(e.target.value) || 0)}
+                className="w-full h-[36px] px-[10px] text-[12px] font-mono bg-white border border-[#cbd5e1] rounded-[6px]"
+                required
+              />
+            </div>
+          </div>
+        </div>
+      </form>
+    </SlideOverDrawer>
   );
 };
