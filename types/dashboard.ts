@@ -42,6 +42,9 @@ export interface ActiveAlertsKpi {
 export interface DashboardSummary {
   telemetry: TelemetryData;
   kpis: {
+    zones?: { total: number };
+    trunks?: { total: number; total_km: number };
+    reserves?: { total: number };
     naps: NapsKpi;
     closures: ClosuresKpi;
     customers: CustomersKpi;

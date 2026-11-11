@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -17,29 +17,55 @@ import {
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { cn } from '@/lib/utils';
+import { apiClient } from '@/lib/api/client';
+import type { DashboardSummary } from '@/types/dashboard';
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: number | string;
+  badgeKey?: 'zones' | 'trunks' | 'naps' | 'closures' | 'customers' | 'reserves';
 }
 
 const navItems: NavItem[] = [
   { name: 'Inicio', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Mapa de red', href: '/mapa', icon: Map },
-  { name: 'Zonas de red', href: '/zonas', icon: MapPin, badge: 4 },
-  { name: 'Troncales', href: '/troncales', icon: GitBranch, badge: 7 },
-  { name: 'Cajas NAP', href: '/naps', icon: Box, badge: 12 },
-  { name: 'Mufas', href: '/mufas', icon: Layers, badge: 28 },
-  { name: 'Clientes', href: '/clientes', icon: Users, badge: 186 },
-  { name: 'Reservas', href: '/reservas', icon: Bookmark, badge: 3 },
+  { name: 'Zonas de red', href: '/zonas', icon: MapPin, badgeKey: 'zones' },
+  { name: 'Troncales', href: '/troncales', icon: GitBranch, badgeKey: 'trunks' },
+  { name: 'Cajas NAP', href: '/naps', icon: Box, badgeKey: 'naps' },
+  { name: 'Mufas', href: '/mufas', icon: Layers, badgeKey: 'closures' },
+  { name: 'Clientes', href: '/clientes', icon: Users, badgeKey: 'customers' },
+  { name: 'Reservas', href: '/reservas', icon: Bookmark, badgeKey: 'reserves' },
   { name: 'Reportes', href: '/reportes', icon: BarChart3 },
   { name: 'Configuración', href: '/configuracion', icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [counts, setCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient<DashboardSummary>('/dashboard/summary')
+      .then((res) => {
+        if (!isMounted || !res?.kpis) return;
+        setCounts({
+          zones: res.kpis.zones?.total ?? 0,
+          trunks: res.kpis.trunks?.total ?? 0,
+          naps: res.kpis.naps?.total ?? 0,
+          closures: res.kpis.closures?.total ?? 0,
+          customers: res.kpis.customers?.total ?? 0,
+          reserves: res.kpis.reserves?.total ?? 0,
+        });
+      })
+      .catch(() => {
+        // Silencioso en caso de sesión expirada en middleware
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [pathname]);
 
   return (
     <aside className="w-[256px] bg-white border-r border-[#8aabe0] flex flex-col justify-between shrink-0 h-screen sticky top-0 z-30 shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
@@ -56,6 +82,7 @@ export function Sidebar() {
               pathname === item.href ||
               (item.href !== '/dashboard' && pathname?.startsWith(item.href));
             const Icon = item.icon;
+            const badgeValue = item.badgeKey ? counts[item.badgeKey] : undefined;
 
             return (
               <Link
@@ -79,7 +106,7 @@ export function Sidebar() {
                   <span>{item.name}</span>
                 </div>
 
-                {item.badge !== undefined && (
+                {badgeValue !== undefined && (
                   <span
                     className={cn(
                       'px-[8px] py-[2px] rounded-full text-[11px] font-semibold border',
@@ -88,7 +115,7 @@ export function Sidebar() {
                         : 'bg-white text-[#153b68] border-[#cbd5e1]'
                     )}
                   >
-                    {item.badge}
+                    {badgeValue}
                   </span>
                 )}
               </Link>

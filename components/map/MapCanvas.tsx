@@ -29,6 +29,33 @@ interface MapCanvasProps {
   onSelectElement?: (element: { type: 'trunk' | 'nap' | 'closure' | 'customer'; data: unknown } | null) => void;
 }
 
+const CARTOMAPS_API_KEY = process.env.NEXT_PUBLIC_CARTOMAPS_API_KEY || '';
+
+function getTileConfig(mode: MapTileMode): { url: string; options: L.TileLayerOptions } {
+  if (mode === 'satellite') {
+    return {
+      url: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+      options: {
+        subdomains: '0123',
+        maxNativeZoom: 20,
+        maxZoom: 20,
+        attribution: 'OptiFiber GIS &copy; Google Satellite',
+      },
+    };
+  }
+
+  const base = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  return {
+    url: CARTOMAPS_API_KEY ? `${base}?key=${CARTOMAPS_API_KEY}` : base,
+    options: {
+      subdomains: 'abcd',
+      maxNativeZoom: 18,
+      maxZoom: 20,
+      attribution: 'OptiFiber GIS &copy; CARTO',
+    },
+  };
+}
+
 export default function MapCanvas({
   trunks,
   naps,
@@ -82,18 +109,6 @@ export default function MapCanvas({
     // Control de escala en esquina inferior derecha
     L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
 
-    // Capa de tiles inicial
-    const tileUrl =
-      tileMode === 'satellite'
-        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-
-    const tileLayer = L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      attribution: 'OptiFiber GIS &copy; CartoDB / Esri',
-    }).addTo(map);
-    tileLayerRef.current = tileLayer;
-
     // Agregar grupos de capas al mapa
     trunksLayerRef.current.addTo(map);
     dropsLayerRef.current.addTo(map);
@@ -107,19 +122,24 @@ export default function MapCanvas({
     return () => {
       map.remove();
       mapInstanceRef.current = null;
+      tileLayerRef.current = null;
     };
-  }, [tileMode]);
+  }, []);
 
-  // 2. Cambio dinámico de Mapa / Satélite
+  // 2. Cambio dinámico de Mapa / Satélite con límites nativos por proveedor
   useEffect(() => {
-    if (!tileLayerRef.current || !mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
 
-    const tileUrl =
-      tileMode === 'satellite'
-        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
+      tileLayerRef.current = null;
+    }
 
-    tileLayerRef.current.setUrl(tileUrl);
+    const { url, options } = getTileConfig(tileMode);
+    const nextLayer = L.tileLayer(url, options).addTo(map);
+    nextLayer.bringToBack();
+    tileLayerRef.current = nextLayer;
   }, [tileMode]);
 
   // 3. Centrar en coordenadas seleccionadas
@@ -154,14 +174,30 @@ export default function MapCanvas({
 
     if (!layers.troncales) return;
 
+    const isSat = tileMode === 'satellite';
+
     trunks.forEach((trunk) => {
       if (!trunk.path || trunk.path.length < 2) return;
 
       const km = Number(trunk.length_km || 0);
+      const trunkColor = trunk.map_color || '#2563eb';
+
+      // En modo satélite, dibujamos una polilínea base (casing / halo) de alto contraste
+      if (isSat) {
+        L.polyline(trunk.path, {
+          color: '#ffffff',
+          weight: 7,
+          opacity: 0.95,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(layer);
+      }
+
       const polyline = L.polyline(trunk.path, {
-        color: trunk.map_color || '#0066ff',
-        weight: 5,
-        opacity: 0.85,
+        color: trunkColor,
+        weight: isSat ? 4.5 : 4,
+        opacity: 1,
+        lineCap: 'round',
         lineJoin: 'round',
       });
 
@@ -180,7 +216,7 @@ export default function MapCanvas({
 
       polyline.addTo(layer);
     });
-  }, [trunks, layers.troncales, onSelectElement]);
+  }, [trunks, layers.troncales, tileMode, onSelectElement]);
 
   // 5. Renderizado de NAPs
   useEffect(() => {
@@ -188,6 +224,8 @@ export default function MapCanvas({
     layer.clearLayers();
 
     if (!layers.naps) return;
+
+    const isSat = tileMode === 'satellite';
 
     naps.forEach((nap) => {
       const isFull = nap.free_ports === 0;
@@ -203,7 +241,11 @@ export default function MapCanvas({
             background: #ffffff;
             border: 2px solid ${badgeBg};
             border-radius: 6px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15);
+            box-shadow: ${
+              isSat
+                ? '0 0 0 2px #ffffff, 0 4px 10px rgba(0,0,0,0.6)'
+                : '0 4px 6px -1px rgba(0,0,0,0.15)'
+            };
             padding: 2px 6px;
             font-family: system-ui, sans-serif;
             font-size: 11px;
@@ -263,7 +305,7 @@ export default function MapCanvas({
 
       marker.addTo(layer);
     });
-  }, [naps, layers.naps, onSelectElement]);
+  }, [naps, layers.naps, tileMode, onSelectElement]);
 
   // 6. Renderizado de Mufas (Splice Closures) y Reservas
   useEffect(() => {
@@ -271,6 +313,8 @@ export default function MapCanvas({
     layer.clearLayers();
 
     if (!layers.mufas) return;
+
+    const isSat = tileMode === 'satellite';
 
     closures.forEach((closure) => {
       const customIcon = L.divIcon({
@@ -281,9 +325,13 @@ export default function MapCanvas({
             align-items: center;
             background: #153b68;
             color: #ffffff;
-            border: 2px solid #38bdf8;
+            border: 2px solid ${isSat ? '#67e8f9' : '#38bdf8'};
             border-radius: 20px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+            box-shadow: ${
+              isSat
+                ? '0 0 0 2px #ffffff, 0 4px 10px rgba(0,0,0,0.6)'
+                : '0 4px 6px -1px rgba(0,0,0,0.2)'
+            };
             padding: 2px 8px;
             font-family: system-ui, sans-serif;
             font-size: 11px;
@@ -327,15 +375,15 @@ export default function MapCanvas({
       if (layers.reservas && closure.reserve_meters > 0) {
         L.circle([closure.latitude, closure.longitude], {
           radius: 12,
-          color: '#8b5cf6',
-          weight: 1.5,
+          color: isSat ? '#c084fc' : '#8b5cf6',
+          weight: isSat ? 2.5 : 1.5,
           dashArray: '4, 4',
           fillColor: '#8b5cf6',
-          fillOpacity: 0.1,
+          fillOpacity: isSat ? 0.25 : 0.1,
         }).addTo(layer);
       }
     });
-  }, [closures, layers.mufas, layers.reservas, onSelectElement]);
+  }, [closures, layers.mufas, layers.reservas, tileMode, onSelectElement]);
 
   // 7. Renderizado de Clientes y cables drop de acometida
   useEffect(() => {
@@ -346,23 +394,29 @@ export default function MapCanvas({
 
     if (!layers.clientes) return;
 
+    const isSat = tileMode === 'satellite';
+
     customers.forEach((customer) => {
       const customIcon = L.divIcon({
         className: 'custom-customer-marker',
         html: `
           <div style="
-            width: 14px;
-            height: 14px;
-            background: #0066ff;
+            width: ${isSat ? '15px' : '14px'};
+            height: ${isSat ? '15px' : '14px'};
+            background: #2563eb;
             border: 2px solid #ffffff;
             border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+            box-shadow: ${
+              isSat
+                ? '0 0 0 1.5px #000000, 0 3px 6px rgba(0,0,0,0.7)'
+                : '0 2px 4px rgba(0,0,0,0.25)'
+            };
             transform: translate(-50%, -50%);
             cursor: pointer;
           "></div>
         `,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
       });
 
       const marker = L.marker([customer.latitude, customer.longitude], { icon: customIcon });
@@ -382,22 +436,31 @@ export default function MapCanvas({
       if (customer.nap_code) {
         const nap = naps.find((n) => n.code === customer.nap_code);
         if (nap) {
-          L.polyline(
-            [
-              [customer.latitude, customer.longitude],
-              [nap.latitude, nap.longitude],
-            ],
-            {
-              color: '#94a3b8',
-              weight: 1.5,
-              dashArray: '3, 4',
+          const latLngs: [number, number][] = [
+            [customer.latitude, customer.longitude],
+            [nap.latitude, nap.longitude],
+          ];
+
+          // En satélite, halo oscuro de fondo para la línea drop punteada
+          if (isSat) {
+            L.polyline(latLngs, {
+              color: '#000000',
+              weight: 3.5,
               opacity: 0.7,
-            }
-          ).addTo(dropLayer);
+              dashArray: '4, 4',
+            }).addTo(dropLayer);
+          }
+
+          L.polyline(latLngs, {
+            color: isSat ? '#38bdf8' : '#94a3b8',
+            weight: isSat ? 2 : 1.5,
+            dashArray: isSat ? '4, 4' : '3, 4',
+            opacity: isSat ? 1 : 0.7,
+          }).addTo(dropLayer);
         }
       }
     });
-  }, [customers, naps, layers.clientes, onSelectElement]);
+  }, [customers, naps, layers.clientes, tileMode, onSelectElement]);
 
   // 8. Manejo de Herramientas de Dibujo y Medición (Click en el mapa)
   const handleMapClick = useCallback(

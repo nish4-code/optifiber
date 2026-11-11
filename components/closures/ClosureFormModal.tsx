@@ -14,6 +14,7 @@ interface ClosureFormModalProps {
   onSaved: () => void;
   closureToEdit?: SpliceClosureItem | null;
   zones: ZoneOption[];
+  defaultType?: 'empalme' | 'distribucion' | 'reserva';
 }
 
 export const ClosureFormModal: React.FC<ClosureFormModalProps> = ({
@@ -22,12 +23,13 @@ export const ClosureFormModal: React.FC<ClosureFormModalProps> = ({
   onSaved,
   closureToEdit,
   zones,
+  defaultType = 'empalme',
 }) => {
   const [formData, setFormData] = useState<ClosureFormData>({
     zone_id: closureToEdit?.zone?.id || (zones[0]?.id ?? null),
     code: closureToEdit?.code || '',
     name: closureToEdit?.name || '',
-    type: closureToEdit?.type || 'empalme',
+    type: closureToEdit?.type || defaultType,
     mount_type: closureToEdit?.mount_type || 'poste',
     fiber_capacity: closureToEdit?.fiber_capacity || 144,
     latitude: closureToEdit?.latitude || -6.7725,
