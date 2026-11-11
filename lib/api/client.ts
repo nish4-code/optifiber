@@ -68,14 +68,39 @@ export async function apiClient<T>(
       } catch {
         errorData = await response.text();
       }
-      const message =
-        typeof errorData === 'object' && errorData !== null && 'message' in errorData
-          ? String((errorData as { message: unknown }).message)
-          : `HTTP error ${response.status}`;
+
+      let message = `HTTP error ${response.status}`;
+      if (
+        typeof errorData === 'object' &&
+        errorData !== null &&
+        'mo' in errorData &&
+        typeof (errorData as { mo: unknown }).mo === 'object' &&
+        Array.isArray((errorData as { mo: { listMessage?: string[] } }).mo?.listMessage) &&
+        ((errorData as { mo: { listMessage: string[] } }).mo.listMessage.length > 0)
+      ) {
+        message = (errorData as { mo: { listMessage: string[] } }).mo.listMessage.join(' ');
+      } else if (
+        typeof errorData === 'object' &&
+        errorData !== null &&
+        'message' in errorData
+      ) {
+        message = String((errorData as { message: unknown }).message);
+      }
+
       throw new ApiError(message, response.status, errorData);
     }
 
-    return (await response.json()) as T;
+    const json = (await response.json()) as unknown;
+    if (
+      typeof json === 'object' &&
+      json !== null &&
+      'mo' in json &&
+      'dto' in json
+    ) {
+      return (json as { dto: T }).dto;
+    }
+
+    return json as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError(
