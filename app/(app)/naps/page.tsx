@@ -1,150 +1,196 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Search, MapPin } from 'lucide-react';
+import { Plus, MapPin, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { apiClient } from '@/lib/api/client';
+import { NapItem } from '@/types/naps';
+import { PaginatedResponse, ZoneOption } from '@/types/api';
+import { NapFilters } from '@/components/naps/NapFilters';
+import { NapTable } from '@/components/naps/NapTable';
+import { NapPortsModal } from '@/components/naps/NapPortsModal';
+import { NapFormModal } from '@/components/naps/NapFormModal';
 
 export default function NapsPage() {
-  const napsDemo = [
-    {
-      code: 'NAP-01',
-      name: 'Bolognesi esq. San José',
-      ratio: '1:8',
-      ports: '7/8',
-      pct: 88,
-      address: 'Jr. Bolognesi 345, Chiclayo',
-      status: 'Operativo',
-    },
-    {
-      code: 'NAP-02',
-      name: 'Bolognesi / Av. Saenz Peña',
-      ratio: '1:16',
-      ports: '12/16',
-      pct: 75,
-      address: 'Jr. Bolognesi 580, Chiclayo',
-      status: 'Operativo',
-    },
-    {
-      code: 'NAP-03',
-      name: 'Av. Balta Frente CC Boulevard',
-      ratio: '1:8',
-      ports: '8/8',
-      pct: 100,
-      address: 'Av. Balta 720, Chiclayo',
-      status: 'Saturado',
-    },
-    {
-      code: 'NAP-04',
-      name: 'Santa Victoria - Los Parques',
-      ratio: '1:8',
-      ports: '3/8',
-      pct: 38,
-      address: 'Calle Los Tumbos 210, Santa Victoria',
-      status: 'Operativo',
-    },
-  ];
+  const [data, setData] = useState<PaginatedResponse<NapItem> | null>(null);
+  const [zones, setZones] = useState<ZoneOption[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Filtros y paginación
+  const [search, setSearch] = useState<string>('');
+  const [selectedZone, setSelectedZone] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [perPage, setPerPage] = useState<number>(15);
+
+  // Modales
+  const [portsModalNap, setPortsModalNap] = useState<NapItem | null>(null);
+  const [isFormModalOpen, setIsFormModalOpen] = useState<boolean>(false);
+  const [napToEdit, setNapToEdit] = useState<NapItem | null>(null);
+
+  // Cargar Zonas para filtro y formularios
+  useEffect(() => {
+    let isMounted = true;
+    apiClient<ZoneOption[]>('/zones')
+      .then((res) => {
+        if (isMounted && Array.isArray(res)) {
+          setZones(res);
+        }
+      })
+      .catch((err) => {
+        console.error('Error cargando zonas:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Cargar Cajas NAP paginadas
+  useEffect(() => {
+    let isMounted = true;
+    const params = new URLSearchParams();
+    params.set('page', currentPage.toString());
+    params.set('per_page', perPage.toString());
+
+    if (search.trim()) params.set('search', search.trim());
+    if (selectedZone) params.set('zone_id', selectedZone);
+    if (selectedStatus) params.set('status', selectedStatus);
+
+    apiClient<PaginatedResponse<NapItem>>(`/naps?${params.toString()}`)
+      .then((res) => {
+        if (isMounted) setData(res);
+      })
+      .catch((err) => {
+        console.error('Error cargando cajas NAP:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentPage, perPage, search, selectedZone, selectedStatus, refreshTrigger]);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setSelectedZone('');
+    setSelectedStatus('');
+    setCurrentPage(1);
+  };
+
+  const handleOpenCreateModal = () => {
+    setNapToEdit(null);
+    setIsFormModalOpen(true);
+  };
+
+  const handleOpenEditModal = (nap: NapItem) => {
+    setNapToEdit(nap);
+    setIsFormModalOpen(true);
+  };
 
   return (
-    <div className="p-[24px] flex flex-col gap-[20px] max-w-[1400px] mx-auto w-full">
+    <div className="p-[24px] flex flex-col gap-[20px] max-w-[1400px] mx-auto w-full animate-in fade-in duration-150">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-[12px]">
         <div>
-          <h1 className="text-[20px] font-bold text-[#153b68]">Cajas de Distribución NAP</h1>
+          <h1 className="text-[20px] font-bold text-[#153b68] flex items-center gap-[8px]">
+            Cajas de Distribución NAP
+            <span className="text-[12px] font-normal text-[#64748b] bg-[#f1f5f9] px-[8px] py-[2px] rounded-full">
+              {data?.total || 0} registradas
+            </span>
+          </h1>
           <p className="text-[13px] text-[#64748b]">
-            Monitoreo y administración de cajas terminales ópticas FTTH y asignación de splitters.
+            Monitoreo, capacidad y asignación de splitters ópticos 1:8 y 1:16 en Chiclayo y Apurímac.
           </p>
         </div>
+
         <div className="flex items-center gap-[8px]">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="gap-[6px] text-[#64748b]"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refrescar
+          </Button>
+
           <Link href="/mapa">
             <Button variant="outline" size="sm" className="gap-[6px]">
-              <MapPin className="w-[14px] h-[14px]" />
-              <span>Ver en mapa</span>
+              <MapPin size={14} />
+              Ver en Mapa GIS
             </Button>
           </Link>
-          <Button variant="primary" size="sm" className="gap-[6px]">
-            <Plus className="w-[14px] h-[14px]" />
-            <span>Nueva caja NAP</span>
+
+          <Button size="sm" onClick={handleOpenCreateModal} className="gap-[6px]">
+            <Plus size={16} />
+            Nueva Caja NAP
           </Button>
         </div>
       </div>
 
-      <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[16px] shadow-xs">
-        <div className="flex items-center justify-between mb-[16px]">
-          <div className="relative w-full max-w-[320px]">
-            <Search className="w-[14px] h-[14px] text-[#94a3b8] absolute left-[10px] top-[10px]" />
-            <input
-              type="text"
-              placeholder="Buscar por código, dirección o splitter..."
-              className="w-full pl-[32px] pr-[12px] py-[6px] text-[12px] border border-[#e2e8f0] rounded-[6px] focus:outline-none focus:border-[#0066ff]"
-            />
-          </div>
-          <span className="text-[12px] text-[#64748b]">
-            Mostrando <strong>{napsDemo.length}</strong> cajas NAP
-          </span>
-        </div>
+      {/* Filtros */}
+      <NapFilters
+        search={search}
+        onSearchChange={(val) => {
+          setSearch(val);
+          setCurrentPage(1);
+        }}
+        selectedZone={selectedZone}
+        onZoneChange={(val) => {
+          setSelectedZone(val);
+          setCurrentPage(1);
+        }}
+        selectedStatus={selectedStatus}
+        onStatusChange={(val) => {
+          setSelectedStatus(val);
+          setCurrentPage(1);
+        }}
+        zones={zones}
+        onReset={handleResetFilters}
+      />
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f8fafc] text-[11px] uppercase tracking-wider text-[#64748b] border-b border-[#e2e8f0]">
-                <th className="py-[10px] px-[16px] font-semibold">Código</th>
-                <th className="py-[10px] px-[16px] font-semibold">Nombre / Ubicación</th>
-                <th className="py-[10px] px-[16px] font-semibold">Dirección</th>
-                <th className="py-[10px] px-[16px] font-semibold">Splitter</th>
-                <th className="py-[10px] px-[16px] font-semibold">Ocupación de Puertos</th>
-                <th className="py-[10px] px-[16px] font-semibold">Estado</th>
-                <th className="py-[10px] px-[16px] font-semibold text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f1f5f9] text-[13px]">
-              {napsDemo.map((nap) => (
-                <tr key={nap.code} className="hover:bg-[#f8fafc] transition-colors">
-                  <td className="py-[12px] px-[16px] font-semibold text-[#153b68]">
-                    <div className="flex items-center gap-[6px]">
-                      <span className="w-[8px] h-[8px] rounded-[2px] bg-[#059669] inline-block" />
-                      {nap.code}
-                    </div>
-                  </td>
-                  <td className="py-[12px] px-[16px] text-[#334155] font-medium">{nap.name}</td>
-                  <td className="py-[12px] px-[16px] text-[#64748b]">{nap.address}</td>
-                  <td className="py-[12px] px-[16px] font-mono text-[#0f172a]">{nap.ratio}</td>
-                  <td className="py-[12px] px-[16px]">
-                    <div className="flex items-center gap-[8px]">
-                      <div className="w-[80px] bg-[#f1f5f9] rounded-full h-[6px] overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            nap.pct === 100
-                              ? 'bg-[#ef4444]'
-                              : nap.pct >= 80
-                              ? 'bg-[#d97706]'
-                              : 'bg-[#059669]'
-                          }`}
-                          style={{ width: `${nap.pct}%` }}
-                        />
-                      </div>
-                      <span className="text-[12px] font-mono text-[#334155]">{nap.ports}</span>
-                    </div>
-                  </td>
-                  <td className="py-[12px] px-[16px]">
-                    <Badge variant={nap.pct === 100 ? 'critical' : 'success'} size="sm">
-                      {nap.status}
-                    </Badge>
-                  </td>
-                  <td className="py-[12px] px-[16px] text-right">
-                    <Link
-                      href="/mapa"
-                      className="inline-flex items-center gap-[4px] text-[12px] text-[#0066ff] hover:underline font-medium"
-                    >
-                      <span>Ver en mapa</span>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Tabla Paginada */}
+      <NapTable
+        data={data}
+        loading={loading}
+        onPageChange={(p) => setCurrentPage(p)}
+        onPerPageChange={(pp) => {
+          setPerPage(pp);
+          setCurrentPage(1);
+        }}
+        onViewPorts={(nap) => setPortsModalNap(nap)}
+        onEditNap={handleOpenEditModal}
+      />
+
+      {/* Modal de Puertos */}
+      {portsModalNap && (
+        <NapPortsModal
+          napId={portsModalNap.id}
+          napCode={portsModalNap.code}
+          onClose={() => setPortsModalNap(null)}
+        />
+      )}
+
+      {/* Modal de Crear / Editar */}
+      {isFormModalOpen && (
+        <NapFormModal
+          isOpen={isFormModalOpen}
+          onClose={() => setIsFormModalOpen(false)}
+          onSaved={handleRefresh}
+          napToEdit={napToEdit}
+          zones={zones}
+        />
+      )}
     </div>
   );
 }

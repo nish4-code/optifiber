@@ -178,7 +178,7 @@ export default function ZonasPage() {
                     {z.city || 'Lambayeque'}
                   </td>
                   <td className="py-[12px] px-[16px] font-mono text-[11px] text-[#475569]">
-                    {z.center_lat.toFixed(4)}, {z.center_lng.toFixed(4)}
+                    {z.center_lat ? Number(z.center_lat).toFixed(4) : '-'}, {z.center_lng ? Number(z.center_lng).toFixed(4) : '-'}
                   </td>
                   <td className="py-[12px] px-[16px]">
                     <div className="flex items-center gap-[6px] text-[11px]">

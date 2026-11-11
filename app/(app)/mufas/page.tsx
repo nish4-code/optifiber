@@ -1,134 +1,224 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Search, MapPin, GitCommit } from 'lucide-react';
+import { Plus, MapPin, RefreshCw, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import { apiClient } from '@/lib/api/client';
+import { SpliceClosureItem } from '@/types/closures';
+import { PaginatedResponse, ZoneOption } from '@/types/api';
+import { ClosureTable } from '@/components/closures/ClosureTable';
+import { ClosureFormModal } from '@/components/closures/ClosureFormModal';
 
 export default function MufasPage() {
-  const mufasDemo = [
-    {
-      code: 'MUFA-01',
-      name: 'Mufa Primaria Parque Principal',
-      type: 'Domo',
-      mount: 'Poste Concreto',
-      capacity: 144,
-      reserve: '30 m',
-      status: 'Operativo',
-    },
-    {
-      code: 'MUFA-02',
-      name: 'Mufa Empalme Bolognesi Oeste',
-      type: 'Horizontal',
-      mount: 'Cámara Subterránea',
-      capacity: 96,
-      reserve: '20 m',
-      status: 'Operativo',
-    },
-    {
-      code: 'MUFA-03',
-      name: 'Mufa Derivación Santa Victoria',
-      type: 'Domo',
-      mount: 'Poste Concreto',
-      capacity: 48,
-      reserve: '15 m',
-      status: 'Operativo',
-    },
-  ];
+  const [data, setData] = useState<PaginatedResponse<SpliceClosureItem> | null>(null);
+  const [zones, setZones] = useState<ZoneOption[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Filtros y paginación
+  const [selectedZone, setSelectedZone] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [perPage, setPerPage] = useState<number>(15);
+
+  // Modales
+  const [isFormModalOpen, setIsFormModalOpen] = useState<boolean>(false);
+  const [closureToEdit, setClosureToEdit] = useState<SpliceClosureItem | null>(null);
+
+  // Cargar Zonas
+  useEffect(() => {
+    let isMounted = true;
+    apiClient<ZoneOption[]>('/zones')
+      .then((res) => {
+        if (isMounted && Array.isArray(res)) {
+          setZones(res);
+        }
+      })
+      .catch((err) => {
+        console.error('Error cargando zonas:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Cargar Mufas paginadas
+  useEffect(() => {
+    let isMounted = true;
+    const params = new URLSearchParams();
+    params.set('page', currentPage.toString());
+    params.set('per_page', perPage.toString());
+
+    if (selectedZone) params.set('zone_id', selectedZone);
+    if (selectedStatus) params.set('status', selectedStatus);
+    if (selectedType) params.set('type', selectedType);
+
+    apiClient<PaginatedResponse<SpliceClosureItem>>(`/closures?${params.toString()}`)
+      .then((res) => {
+        if (isMounted) setData(res);
+      })
+      .catch((err) => {
+        console.error('Error cargando mufas:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentPage, perPage, selectedZone, selectedStatus, selectedType, refreshTrigger]);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedZone('');
+    setSelectedStatus('');
+    setSelectedType('');
+    setCurrentPage(1);
+  };
+
+  const handleOpenCreateModal = () => {
+    setClosureToEdit(null);
+    setIsFormModalOpen(true);
+  };
+
+  const handleOpenEditModal = (closure: SpliceClosureItem) => {
+    setClosureToEdit(closure);
+    setIsFormModalOpen(true);
+  };
 
   return (
-    <div className="p-[24px] flex flex-col gap-[20px] max-w-[1400px] mx-auto w-full">
+    <div className="p-[24px] flex flex-col gap-[20px] max-w-[1400px] mx-auto w-full animate-in fade-in duration-150">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-[12px]">
         <div>
-          <h1 className="text-[20px] font-bold text-[#153b68]">Mufas de Empalme Óptico</h1>
+          <h1 className="text-[20px] font-bold text-[#153b68] flex items-center gap-[8px]">
+            Mufas y Puntos de Empalme
+            <span className="text-[12px] font-normal text-[#64748b] bg-[#f1f5f9] px-[8px] py-[2px] rounded-full">
+              {data?.total || 0} registradas
+            </span>
+          </h1>
           <p className="text-[13px] text-[#64748b]">
-            Registro de cierres de empalme, bandejas de fusión y reservas técnicas de fibra.
+            Gestión de mufas aéreas, subterráneas y reservas ópticas de hasta 144 hilos.
           </p>
         </div>
+
         <div className="flex items-center gap-[8px]">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="gap-[6px] text-[#64748b]"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refrescar
+          </Button>
+
           <Link href="/mapa">
             <Button variant="outline" size="sm" className="gap-[6px]">
-              <MapPin className="w-[14px] h-[14px]" />
-              <span>Ver en mapa</span>
+              <MapPin size={14} />
+              Ver en Mapa GIS
             </Button>
           </Link>
-          <Button variant="primary" size="sm" className="gap-[6px]">
-            <Plus className="w-[14px] h-[14px]" />
-            <span>Nueva mufa</span>
+
+          <Button size="sm" onClick={handleOpenCreateModal} className="gap-[6px]">
+            <Plus size={16} />
+            Nueva Mufa
           </Button>
         </div>
       </div>
 
-      <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[16px] shadow-xs">
-        <div className="flex items-center justify-between mb-[16px]">
-          <div className="relative w-full max-w-[320px]">
-            <Search className="w-[14px] h-[14px] text-[#94a3b8] absolute left-[10px] top-[10px]" />
-            <input
-              type="text"
-              placeholder="Buscar por código, tipo o instalación..."
-              className="w-full pl-[32px] pr-[12px] py-[6px] text-[12px] border border-[#e2e8f0] rounded-[6px] focus:outline-none focus:border-[#0066ff]"
-            />
-          </div>
-          <span className="text-[12px] text-[#64748b]">
-            Mostrando <strong>{mufasDemo.length}</strong> mufas
-          </span>
-        </div>
+      {/* Filtros */}
+      <div className="bg-white border border-[#e2e8f0] rounded-[10px] p-[16px] shadow-xs flex flex-col md:flex-row gap-[12px] items-stretch md:items-center justify-between">
+        <div className="flex flex-wrap items-center gap-[10px]">
+          <select
+            value={selectedZone}
+            onChange={(e) => {
+              setSelectedZone(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-[38px] px-[12px] text-[13px] text-[#334155] bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] cursor-pointer"
+          >
+            <option value="">Todas las zonas</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id.toString()}>
+                {z.name}
+              </option>
+            ))}
+          </select>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#f8fafc] text-[11px] uppercase tracking-wider text-[#64748b] border-b border-[#e2e8f0]">
-                <th className="py-[10px] px-[16px] font-semibold">Código</th>
-                <th className="py-[10px] px-[16px] font-semibold">Nombre / Ubicación</th>
-                <th className="py-[10px] px-[16px] font-semibold">Tipo</th>
-                <th className="py-[10px] px-[16px] font-semibold">Montaje</th>
-                <th className="py-[10px] px-[16px] font-semibold">Capacidad de Fusión</th>
-                <th className="py-[10px] px-[16px] font-semibold">Reserva</th>
-                <th className="py-[10px] px-[16px] font-semibold">Estado</th>
-                <th className="py-[10px] px-[16px] font-semibold text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#f1f5f9] text-[13px]">
-              {mufasDemo.map((mufa) => (
-                <tr key={mufa.code} className="hover:bg-[#f8fafc] transition-colors">
-                  <td className="py-[12px] px-[16px] font-semibold text-[#153b68]">
-                    <div className="flex items-center gap-[6px]">
-                      <span className="w-[8px] h-[8px] rounded-full bg-[#153b68] border border-[#38bdf8] inline-block" />
-                      {mufa.code}
-                    </div>
-                  </td>
-                  <td className="py-[12px] px-[16px] text-[#334155] font-medium">{mufa.name}</td>
-                  <td className="py-[12px] px-[16px] text-[#64748b]">{mufa.type}</td>
-                  <td className="py-[12px] px-[16px] text-[#64748b]">{mufa.mount}</td>
-                  <td className="py-[12px] px-[16px] font-mono text-[#0f172a]">
-                    {mufa.capacity} hilos
-                  </td>
-                  <td className="py-[12px] px-[16px]">
-                    <span className="px-[8px] py-[2px] bg-[#8b5cf6]/10 text-[#8b5cf6] text-[11px] font-semibold rounded-[4px]">
-                      {mufa.reserve}
-                    </span>
-                  </td>
-                  <td className="py-[12px] px-[16px]">
-                    <Badge variant="success" size="sm">
-                      {mufa.status}
-                    </Badge>
-                  </td>
-                  <td className="py-[12px] px-[16px] text-right">
-                    <Link
-                      href="/mapa"
-                      className="inline-flex items-center gap-[4px] text-[12px] text-[#0066ff] hover:underline font-medium"
-                    >
-                      <GitCommit className="w-[12px] h-[12px]" />
-                      <span>Matriz de Fusión</span>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <select
+            value={selectedType}
+            onChange={(e) => {
+              setSelectedType(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-[38px] px-[12px] text-[13px] text-[#334155] bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] cursor-pointer"
+          >
+            <option value="">Todos los tipos</option>
+            <option value="empalme">Empalme</option>
+            <option value="distribucion">Distribución</option>
+            <option value="reserva">Reserva Óptica</option>
+          </select>
+
+          <select
+            value={selectedStatus}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-[38px] px-[12px] text-[13px] text-[#334155] bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] cursor-pointer"
+          >
+            <option value="">Todos los estados</option>
+            <option value="activo">Activo</option>
+            <option value="alerta">Alerta</option>
+            <option value="mantenimiento">Mantenimiento</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+
+          {(selectedZone || selectedType || selectedStatus) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilters}
+              className="text-[#64748b] hover:text-[#0f172a] gap-[6px]"
+            >
+              <RotateCcw size={14} />
+              Limpiar
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Tabla Paginada */}
+      <ClosureTable
+        data={data}
+        loading={loading}
+        onPageChange={(p) => setCurrentPage(p)}
+        onPerPageChange={(pp) => {
+          setPerPage(pp);
+          setCurrentPage(1);
+        }}
+        onEditClosure={handleOpenEditModal}
+      />
+
+      {/* Modal Crear / Editar */}
+      {isFormModalOpen && (
+        <ClosureFormModal
+          isOpen={isFormModalOpen}
+          onClose={() => setIsFormModalOpen(false)}
+          onSaved={handleRefresh}
+          closureToEdit={closureToEdit}
+          zones={zones}
+        />
+      )}
     </div>
   );
 }

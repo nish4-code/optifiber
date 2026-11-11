@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { TopNavbar } from '@/components/layout/TopNavbar';
@@ -10,7 +10,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <div className="flex min-h-screen bg-[#f1f5f9]">
         {/* Barra Lateral Izquierda */}
-        <Sidebar />
+        <Suspense
+          fallback={
+            <aside className="w-[256px] bg-white border-r border-[#8aabe0] shrink-0 h-screen sticky top-0 z-30" />
+          }
+        >
+          <Sidebar />
+        </Suspense>
 
         {/* Área de Contenido Principal */}
         <div className="flex-1 flex flex-col min-w-0">
