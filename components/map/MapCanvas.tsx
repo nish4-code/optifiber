@@ -557,37 +557,54 @@ export default function MapCanvas({
     };
   }, [toolMode, handleMapClick, handleMapDoubleClick]);
 
+  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#e2e8f0]">
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* Leyenda flotante en esquina inferior izquierda */}
-      <div className="absolute bottom-[24px] left-[24px] z-10 bg-white/95 backdrop-blur-md border border-[#e2e8f0] rounded-[8px] p-[10px] shadow-md pointer-events-auto">
-        <h5 className="text-[11px] font-bold text-[#153b68] mb-[6px] uppercase tracking-wider">
-          Leyenda de Red
-        </h5>
-        <div className="flex flex-col gap-[4px] text-[11px] text-[#334155]">
+      {/* Leyenda flotante colapsable en esquina inferior derecha */}
+      <div className="absolute bottom-[24px] right-[24px] z-10 bg-white/95 backdrop-blur-md border border-[#e2e8f0] rounded-[8px] shadow-lg pointer-events-auto transition-all overflow-hidden max-w-[260px]">
+        <button
+          type="button"
+          onClick={() => setIsLegendExpanded(!isLegendExpanded)}
+          className="w-full px-[12px] py-[8px] flex items-center justify-between gap-[8px] bg-[#f8fafc] hover:bg-[#f1f5f9] transition-colors cursor-pointer text-left"
+        >
           <div className="flex items-center gap-[6px]">
-            <span className="w-[10px] h-[10px] rounded-[3px] bg-[#059669] inline-block" />
-            <span>Caja NAP (Distribución FTTH)</span>
+            <span className="w-[8px] h-[8px] rounded-full bg-[#0066ff]" />
+            <h5 className="text-[11px] font-bold text-[#153b68] uppercase tracking-wider">
+              Leyenda de Red
+            </h5>
           </div>
-          <div className="flex items-center gap-[6px]">
-            <span className="w-[10px] h-[10px] rounded-full bg-[#153b68] border border-[#38bdf8] inline-block" />
-            <span>Mufa de Empalme Primaria</span>
+          <span className="text-[10px] text-[#64748b] font-medium">
+            {isLegendExpanded ? 'Ocultar' : 'Ver'}
+          </span>
+        </button>
+
+        {isLegendExpanded && (
+          <div className="p-[10px] pt-[6px] border-t border-[#f1f5f9] flex flex-col gap-[5px] text-[11px] text-[#334155]">
+            <div className="flex items-center gap-[6px]">
+              <span className="w-[10px] h-[10px] rounded-[3px] bg-[#059669] inline-block shrink-0" />
+              <span>Caja NAP (Distribución FTTH)</span>
+            </div>
+            <div className="flex items-center gap-[6px]">
+              <span className="w-[10px] h-[10px] rounded-full bg-[#153b68] border border-[#38bdf8] inline-block shrink-0" />
+              <span>Mufa de Empalme Primaria</span>
+            </div>
+            <div className="flex items-center gap-[6px]">
+              <span className="w-[12px] h-[3px] bg-[#0066ff] inline-block shrink-0" />
+              <span>Tendido Troncal (TIA-598)</span>
+            </div>
+            <div className="flex items-center gap-[6px]">
+              <span className="w-[8px] h-[8px] rounded-full bg-[#0066ff] inline-block shrink-0" />
+              <span>Abonado / Cliente Activo</span>
+            </div>
+            <div className="flex items-center gap-[6px]">
+              <span className="w-[10px] h-[10px] rounded-full border border-dashed border-[#8b5cf6] inline-block shrink-0" />
+              <span>Reserva Técnica de Fibra</span>
+            </div>
           </div>
-          <div className="flex items-center gap-[6px]">
-            <span className="w-[12px] h-[3px] bg-[#0066ff] inline-block" />
-            <span>Tendido Troncal (TIA-598)</span>
-          </div>
-          <div className="flex items-center gap-[6px]">
-            <span className="w-[8px] h-[8px] rounded-full bg-[#0066ff] inline-block" />
-            <span>Abonado / Cliente Activo</span>
-          </div>
-          <div className="flex items-center gap-[6px]">
-            <span className="w-[10px] h-[10px] rounded-full border border-dashed border-[#8b5cf6] inline-block" />
-            <span>Reserva Técnica de Fibra</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
