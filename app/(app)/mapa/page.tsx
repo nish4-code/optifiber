@@ -468,7 +468,7 @@ export default function MapaPage() {
       {/* Contenedor Cartográfico Central */}
       <div className="relative flex-1 h-full flex flex-col overflow-hidden">
         {/* Controles superiores flotantes (Filtros de capa y Switch Mapa/Satélite) */}
-        <div className="absolute top-[16px] left-[16px] z-10 pointer-events-auto">
+        <div className="absolute top-[16px] left-[68px] z-10 pointer-events-auto">
           <TopMapControls
             tileMode={tileMode}
             onTileModeChange={setTileMode}
