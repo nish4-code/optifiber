@@ -464,7 +464,7 @@ export default function MapaPage() {
   };
 
   return (
-    <div className="relative w-full h-[calc(100vh-60px)] flex overflow-hidden">
+    <div className="relative w-full h-full flex overflow-hidden">
       {/* Contenedor Cartográfico Central */}
       <div className="relative flex-1 h-full flex flex-col overflow-hidden">
         {/* Controles superiores flotantes (Filtros de capa y Switch Mapa/Satélite) */}

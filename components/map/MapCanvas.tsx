@@ -558,7 +558,7 @@ export default function MapCanvas({
   }, [toolMode, handleMapClick, handleMapDoubleClick]);
 
   return (
-    <div className="relative w-full h-full min-h-[500px] overflow-hidden bg-[#e2e8f0]">
+    <div className="relative w-full h-full overflow-hidden bg-[#e2e8f0]">
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
       {/* Leyenda flotante en esquina inferior izquierda */}
