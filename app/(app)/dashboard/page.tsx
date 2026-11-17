@@ -67,52 +67,52 @@ export default function DashboardPage() {
         {/* Tarjeta 1: Cajas NAP */}
         <KpiCard
           title="Cajas NAP"
-          value={naps?.total ?? 12}
-          badgeText={`${naps?.occupancy_percentage ?? 75}% ocupación`}
+          value={naps?.total ?? 0}
+          badgeText={`${naps?.occupancy_percentage ?? 0}% ocupación`}
           badgeVariant="success"
           icon={<Box className="w-[18px] h-[18px] text-[#059669]" />}
           iconBgColor="bg-[#ecfdf5]"
           subStats={[
-            { label: 'activas', value: naps?.active ?? 8, color: 'text-[#059669]' },
-            { label: 'mant.', value: naps?.maintenance ?? 2 },
-            { label: 'inactivas', value: naps?.inactive ?? 2 },
+            { label: 'activas', value: naps?.active ?? 0, color: 'text-[#059669]' },
+            { label: 'mant.', value: naps?.maintenance ?? 0 },
+            { label: 'inactivas', value: naps?.inactive ?? 0 },
           ]}
         />
 
         {/* Tarjeta 2: Mufas */}
         <KpiCard
           title="Mufas & Empalmes"
-          value={closures?.total ?? 28}
+          value={closures?.total ?? 0}
           badgeText="Fusión OK"
           badgeVariant="neutral"
           icon={<Layers className="w-[18px] h-[18px] text-[#0066ff]" />}
           iconBgColor="bg-[#eff6ff]"
           subStats={[
-            { label: 'activas', value: closures?.active ?? 25, color: 'text-[#0066ff]' },
-            { label: 'en mant.', value: closures?.maintenance ?? 2 },
-            { label: 'inactiva', value: closures?.inactive ?? 1 },
+            { label: 'activas', value: closures?.active ?? 0, color: 'text-[#0066ff]' },
+            { label: 'en mant.', value: closures?.maintenance ?? 0 },
+            { label: 'inactiva', value: closures?.inactive ?? 0 },
           ]}
         />
 
         {/* Tarjeta 3: Abonados / Clientes */}
         <KpiCard
           title="Abonados / Clientes"
-          value={custKpi?.total ?? 186}
-          badgeText={`+${custKpi?.new_this_month ?? 12} este mes`}
+          value={custKpi?.total ?? 0}
+          badgeText={`+${custKpi?.new_this_month ?? 0} este mes`}
           badgeVariant="success"
           icon={<Users className="w-[18px] h-[18px] text-[#4f46e5]" />}
           iconBgColor="bg-[#eef2ff]"
           subStats={[
-            { label: 'activos', value: custKpi?.active ?? 178, color: 'text-[#059669]' },
-            { label: 'susp.', value: custKpi?.suspended ?? 5 },
-            { label: 'pend.', value: custKpi?.pending ?? 3 },
+            { label: 'activos', value: custKpi?.active ?? 0, color: 'text-[#059669]' },
+            { label: 'susp.', value: custKpi?.suspended ?? 0 },
+            { label: 'pend.', value: custKpi?.pending ?? 0 },
           ]}
         />
 
         {/* Tarjeta 4: Tráfico de Red */}
         <KpiCard
           title="Tráfico de Red"
-          value={traffic?.peak_gbps ?? 4.2}
+          value={traffic?.peak_gbps ?? 0}
           badgeText="Gbps pico"
           badgeVariant="neutral"
           icon={<Activity className="w-[18px] h-[18px] text-[#0891b2]" />}
@@ -130,24 +130,24 @@ export default function DashboardPage() {
             </div>
           }
           subStats={[
-            { label: 'Down', value: `${traffic?.down_gbps ?? 3.4} Gbps` },
-            { label: 'Up', value: `${traffic?.up_mbps ?? 820} Mbps` },
+            { label: 'Down', value: `${traffic?.down_gbps ?? 0} Gbps` },
+            { label: 'Up', value: `${traffic?.up_mbps ?? 0} Mbps` },
           ]}
         />
 
         {/* Tarjeta 5: Alertas Críticas */}
         <KpiCard
           title="Alertas Activas"
-          value={activeAlerts?.count ?? 3}
+          value={activeAlerts?.count ?? 0}
           valueColor="text-[#ef4444]"
-          badgeText="Atención requerida"
-          badgeVariant="critical"
+          badgeText={(activeAlerts?.count ?? 0) > 0 ? 'Atención requerida' : 'Sin alertas'}
+          badgeVariant={(activeAlerts?.count ?? 0) > 0 ? 'critical' : 'success'}
           borderColor="border-[#fecdd3]"
           icon={<AlertTriangle className="w-[18px] h-[18px] text-[#e11d48]" />}
           iconBgColor="bg-[#ffe4e6]"
           subStats={[
-            { label: 'capacidad NAP', value: 2, color: 'text-[#be123c]' },
-            { label: 'mantenimiento', value: 1, color: 'text-[#be123c]' },
+            { label: 'críticas', value: alerts.filter((a) => a.severity === 'critical').length, color: 'text-[#be123c]' },
+            { label: 'avisos', value: alerts.filter((a) => a.severity === 'warning').length, color: 'text-[#be123c]' },
           ]}
         />
       </section>
@@ -157,13 +157,17 @@ export default function DashboardPage() {
         {/* Columna Izquierda (Ancho 8/12) */}
         <div className="lg:col-span-8 flex flex-col gap-[20px]">
           {/* Mini Visor de Mapa de Red con Estilo Fiberplus */}
-          <MiniMap />
+          <MiniMap
+            napsCount={naps?.total ?? 0}
+            closuresCount={closures?.total ?? 0}
+            customersCount={custKpi?.total ?? 0}
+          />
 
           {/* Capacidad y Ocupación por Zonas */}
           <ZoneCapacity zones={zones} />
 
           {/* Altas Recientes / Últimos Clientes Conectados */}
-          <LatestCustomersTable customers={customers} totalCount={custKpi?.total ?? 186} />
+          <LatestCustomersTable customers={customers} totalCount={custKpi?.total ?? 0} />
         </div>
 
         {/* Columna Derecha (Ancho 4/12) */}

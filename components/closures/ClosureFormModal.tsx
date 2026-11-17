@@ -33,8 +33,8 @@ export const ClosureFormModal: React.FC<ClosureFormModalProps> = ({
     type: closureToEdit?.type || defaultType,
     mount_type: closureToEdit?.mount_type || 'poste',
     fiber_capacity: closureToEdit?.fiber_capacity || 144,
-    latitude: closureToEdit?.latitude || -6.7725,
-    longitude: closureToEdit?.longitude || -79.8415,
+    latitude: closureToEdit?.latitude || -13.6339,
+    longitude: closureToEdit?.longitude || -72.8814,
     reserve_meters: closureToEdit?.reserve_meters || 15.0,
     status: closureToEdit?.status || 'activo',
   });

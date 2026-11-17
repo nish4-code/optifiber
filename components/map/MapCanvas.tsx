@@ -2,14 +2,16 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
-import type {
-  MapTrunk,
-  MapNap,
-  MapClosure,
-  MapCustomer,
-  LayerVisibilityState,
-  MapTileMode,
-  GisToolMode,
+import {
+  normalizeTrunkSegments,
+  type MapTrunk,
+  type MapNap,
+  type MapClosure,
+  type MapCustomer,
+  type MapZone,
+  type LayerVisibilityState,
+  type MapTileMode,
+  type GisToolMode,
 } from '@/types/map';
 
 interface MapCanvasProps {
@@ -17,12 +19,16 @@ interface MapCanvasProps {
   naps: MapNap[];
   closures: MapClosure[];
   customers: MapCustomer[];
+  zones?: MapZone[];
   layers: LayerVisibilityState;
   tileMode: MapTileMode;
   toolMode: GisToolMode;
   onToolModeChange?: (mode: GisToolMode) => void;
-  onTrunkDrawn?: (coords: Array<[number, number]>, lengthMeters: number) => void;
-  onPointCountChange?: (count: number) => void;
+  drawingSegments?: Array<Array<[number, number]>>;
+  onDrawingSegmentsChange?: (segments: Array<Array<[number, number]>>) => void;
+  editingTrunkId?: number | null;
+  onTrunkDrawn?: (segments: Array<Array<[number, number]>>, lengthMeters: number) => void;
+  onMapClickForNap?: (lat: number, lng: number) => void;
   focusedCoordinates?: [number, number] | null;
   fitBoundsTrigger?: number;
   selectedElement?: { type: 'trunk' | 'nap' | 'closure' | 'customer'; data: unknown } | null;
@@ -61,11 +67,16 @@ export default function MapCanvas({
   naps,
   closures,
   customers,
+  zones = [],
   layers,
   tileMode,
   toolMode,
+  onToolModeChange,
+  drawingSegments = [],
+  onDrawingSegmentsChange,
+  editingTrunkId = null,
   onTrunkDrawn,
-  onPointCountChange,
+  onMapClickForNap,
   focusedCoordinates,
   fitBoundsTrigger,
   onSelectElement,
@@ -75,6 +86,7 @@ export default function MapCanvas({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   // Capas Leaflet administradas
+  const zonesLayerRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
   const trunksLayerRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
   const napsLayerRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
   const closuresLayerRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
@@ -82,23 +94,25 @@ export default function MapCanvas({
   const dropsLayerRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
   const drawingLayerRef = useRef<L.FeatureGroup>(new L.FeatureGroup());
 
-  // Estado del dibujo o medición interactiva
-  const [drawingPoints, setDrawingPoints] = useState<L.LatLng[]>([]);
-  const drawingPointsRef = useRef<L.LatLng[]>([]);
+  const drawingSegmentsRef = useRef<Array<Array<[number, number]>>>(drawingSegments);
+  const toolModeRef = useRef<GisToolMode>(toolMode);
 
   useEffect(() => {
-    drawingPointsRef.current = drawingPoints;
-    onPointCountChange?.(drawingPoints.length);
-  }, [drawingPoints, onPointCountChange]);
+    drawingSegmentsRef.current = drawingSegments;
+  }, [drawingSegments]);
+
+  useEffect(() => {
+    toolModeRef.current = toolMode;
+  }, [toolMode]);
 
   // 1. Inicialización del Mapa
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // Centro inicial: Chiclayo Centro (Parque Principal / Jr. Bolognesi)
+    // Centro inicial: Abancay, Apurímac
     const map = L.map(mapContainerRef.current, {
-      center: [-6.7714, -79.8409],
-      zoom: 16,
+      center: [-13.6339, -72.8814],
+      zoom: 15,
       zoomControl: false,
       attributionControl: false,
     });
@@ -110,6 +124,7 @@ export default function MapCanvas({
     L.control.scale({ position: 'bottomright', imperial: false }).addTo(map);
 
     // Agregar grupos de capas al mapa
+    zonesLayerRef.current.addTo(map);
     trunksLayerRef.current.addTo(map);
     dropsLayerRef.current.addTo(map);
     closuresLayerRef.current.addTo(map);
@@ -167,6 +182,34 @@ export default function MapCanvas({
     }
   }, [fitBoundsTrigger, trunks, naps, closures, customers]);
 
+  // 3.2. Renderizado de polígonos de Zonas
+  useEffect(() => {
+    const layer = zonesLayerRef.current;
+    layer.clearLayers();
+
+    if (!layers.zonas) return;
+
+    zones.forEach((zone) => {
+      if (!zone.polygon || zone.polygon.length < 3) return;
+
+      const poly = L.polygon(zone.polygon, {
+        color: '#6366f1',
+        weight: 2,
+        dashArray: '6, 4',
+        fillColor: '#6366f1',
+        fillOpacity: 0.08,
+        interactive: false,
+      });
+
+      poly.bindTooltip(`Zona: ${zone.name} (${zone.code})`, {
+        direction: 'center',
+        className: 'optifiber-map-tooltip',
+      });
+
+      poly.addTo(layer);
+    });
+  }, [zones, layers.zonas]);
+
   // 4. Renderizado de Troncales
   useEffect(() => {
     const layer = trunksLayerRef.current;
@@ -177,14 +220,16 @@ export default function MapCanvas({
     const isSat = tileMode === 'satellite';
 
     trunks.forEach((trunk) => {
-      if (!trunk.path || trunk.path.length < 2) return;
+      const segments = normalizeTrunkSegments(trunk.path).filter((seg) => seg.length >= 2);
+      if (segments.length === 0) return;
+      if (editingTrunkId !== null && trunk.id === editingTrunkId) return;
 
       const km = Number(trunk.length_km || 0);
       const trunkColor = trunk.map_color || '#2563eb';
 
       // En modo satélite, dibujamos una polilínea base (casing / halo) de alto contraste
       if (isSat) {
-        L.polyline(trunk.path, {
+        L.polyline(segments, {
           color: '#ffffff',
           weight: 7,
           opacity: 0.95,
@@ -193,7 +238,7 @@ export default function MapCanvas({
         }).addTo(layer);
       }
 
-      const polyline = L.polyline(trunk.path, {
+      const polyline = L.polyline(segments, {
         color: trunkColor,
         weight: isSat ? 4.5 : 4,
         opacity: 1,
@@ -210,13 +255,26 @@ export default function MapCanvas({
         { sticky: true, direction: 'top', className: 'optifiber-map-tooltip' }
       );
 
-      polyline.on('click', () => {
+      polyline.on('click', (e) => {
+        if (toolModeRef.current === 'draw_trunk' || toolModeRef.current === 'measure') {
+          L.DomEvent.stopPropagation(e);
+          const current = drawingSegmentsRef.current;
+          const clickedPt: [number, number] = [e.latlng.lat, e.latlng.lng];
+          if (current.length === 0) {
+            onDrawingSegmentsChange?.([[clickedPt]]);
+          } else {
+            const lastIdx = current.length - 1;
+            const next = current.map((seg, i) => (i === lastIdx ? [...seg, clickedPt] : seg));
+            onDrawingSegmentsChange?.(next);
+          }
+          return;
+        }
         onSelectElement?.({ type: 'trunk', data: trunk });
       });
 
       polyline.addTo(layer);
     });
-  }, [trunks, layers.troncales, tileMode, onSelectElement]);
+  }, [trunks, layers.troncales, tileMode, editingTrunkId, onSelectElement, onDrawingSegmentsChange]);
 
   // 5. Renderizado de NAPs
   useEffect(() => {
@@ -286,7 +344,7 @@ export default function MapCanvas({
           <div style="font-weight: 700; font-size: 13px; color: #153b68; margin-bottom: 4px;">
             ${nap.code} — ${nap.name}
           </div>
-          <div style="margin-bottom: 2px;"><strong>Dirección:</strong> ${nap.address || 'Chiclayo'}</div>
+          <div style="margin-bottom: 2px;"><strong>Dirección:</strong> ${nap.address || 'Sin dirección'}</div>
           <div style="margin-bottom: 2px;"><strong>Splitter:</strong> ${nap.splitter_ratio || '1:8'}</div>
           <div style="margin-bottom: 2px;">
             <strong>Ocupación:</strong> ${nap.occupied_ports} de ${nap.port_capacity} puertos (${nap.occupancy_percentage}%)
@@ -462,72 +520,249 @@ export default function MapCanvas({
     });
   }, [customers, naps, layers.clientes, tileMode, onSelectElement]);
 
-  // 8. Manejo de Herramientas de Dibujo y Medición (Click en el mapa)
+  // 8. Renderizado reactivo de segmentos, vértices y polilíneas en modo dibujo/medición
+  useEffect(() => {
+    const drawingLayer = drawingLayerRef.current;
+    drawingLayer.clearLayers();
+
+    if (drawingSegments.length === 0) {
+      return;
+    }
+
+    const totalPoints = drawingSegments.reduce((acc, seg) => acc + seg.length, 0);
+    let totalDistanceMeters = 0;
+
+    drawingSegments.forEach((seg) => {
+      for (let i = 0; i < seg.length - 1; i++) {
+        totalDistanceMeters += L.latLng(seg[i][0], seg[i][1]).distanceTo(
+          L.latLng(seg[i + 1][0], seg[i + 1][1])
+        );
+      }
+    });
+
+    const lastSegIdx = drawingSegments.length - 1;
+
+    drawingSegments.forEach((segment, segIdx) => {
+      const latLngs = segment.map(([lat, lng]) => L.latLng(lat, lng));
+      if (latLngs.length === 0) return;
+
+      const isActiveSegment = segIdx === lastSegIdx;
+
+      // Polilínea o Polígono conectando los puntos del segmento
+      if (toolMode === 'draw_zone' && segIdx === 0 && latLngs.length >= 3) {
+        const poly = L.polygon(latLngs, {
+          color: '#8b5cf6',
+          weight: 3,
+          dashArray: '5, 5',
+          fillColor: '#8b5cf6',
+          fillOpacity: 0.18,
+        }).addTo(drawingLayer);
+
+        poly.bindTooltip(
+          `<strong>Área de Zona:</strong> ${latLngs.length} vértices`,
+          { permanent: true, direction: 'top', className: 'optifiber-map-tooltip' }
+        ).openTooltip(latLngs[latLngs.length - 1]);
+      } else if (latLngs.length > 1) {
+        const poly = L.polyline(latLngs, {
+          color: toolMode === 'measure' ? '#10b981' : toolMode === 'draw_zone' ? '#8b5cf6' : '#0066ff',
+          weight: 4,
+          dashArray: toolMode === 'measure' || toolMode === 'draw_zone' ? '6, 6' : undefined,
+        }).addTo(drawingLayer);
+
+        if (isActiveSegment) {
+          poly.bindTooltip(
+            `<strong>${toolMode === 'measure' ? 'Distancia' : toolMode === 'draw_zone' ? 'Zona' : 'Longitud'}:</strong> ${totalDistanceMeters.toFixed(1)} m (${totalPoints} pts)`,
+            { permanent: true, direction: 'top', className: 'optifiber-map-tooltip' }
+          ).openTooltip(latLngs[latLngs.length - 1]);
+        }
+      }
+
+      // Marcadores arrastrables, ramificables y eliminables en cada vértice
+      latLngs.forEach((pt, idx) => {
+        const isActiveTip = isActiveSegment && idx === latLngs.length - 1;
+        const size = isActiveTip ? 15 : 12;
+        const vertexIcon = L.divIcon({
+          className: 'vertex-marker',
+          html: `<div style="
+            width: ${size}px;
+            height: ${size}px;
+            background: ${isActiveTip ? '#f59e0b' : toolMode === 'measure' ? '#10b981' : toolMode === 'draw_zone' ? '#8b5cf6' : '#0066ff'};
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+            cursor: pointer;
+          "></div>`,
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
+        });
+
+        const marker = L.marker(pt, {
+          icon: vertexIcon,
+          draggable: true,
+        });
+
+        marker.bindTooltip(
+          isActiveTip
+            ? `Punto activo · Arrastra para mover · Clic derecho borra`
+            : toolMode === 'select'
+            ? `Punto #${idx + 1} · Clic para iniciar rama aquí · Arrastra para mover · Clic derecho borra`
+            : `Punto #${idx + 1} · Clic para conectar/cerrar · Shift+Clic para nueva rama · Clic derecho borra`,
+          { direction: 'top', className: 'optifiber-map-tooltip' }
+        );
+
+        marker.on('click', (ev) => {
+          L.DomEvent.stopPropagation(ev);
+          if (isActiveTip) return;
+
+          const current = drawingSegmentsRef.current;
+          const wantsBranch =
+            toolModeRef.current === 'select' ||
+            ev.originalEvent.shiftKey ||
+            ev.originalEvent.altKey;
+
+          if (wantsBranch) {
+            if (toolModeRef.current === 'select') {
+              onToolModeChange?.('draw_trunk');
+            }
+            const cleaned = current.filter(
+              (seg, sIdx) => !(sIdx === current.length - 1 && seg.length <= 1)
+            );
+            onDrawingSegmentsChange?.([...cleaned, [[pt.lat, pt.lng]]]);
+            return;
+          }
+
+          // En modo dibujo, clic normal conecta/cierra desde el punto activo hacia este vértice
+          if (current.length === 0) {
+            onDrawingSegmentsChange?.([[[pt.lat, pt.lng]]]);
+            return;
+          }
+          const lastIdx = current.length - 1;
+          const next = current.map((seg, i) =>
+            i === lastIdx ? [...seg, [pt.lat, pt.lng] as [number, number]] : seg
+          );
+          onDrawingSegmentsChange?.(next);
+        });
+
+        marker.on('dragend', (ev) => {
+          const updatedPos = (ev.target as L.Marker).getLatLng();
+          const next = drawingSegmentsRef.current.map((seg, sIdx) =>
+            sIdx === segIdx
+              ? seg.map((p, i) => (i === idx ? ([updatedPos.lat, updatedPos.lng] as [number, number]) : p))
+              : seg
+          );
+          onDrawingSegmentsChange?.(next);
+        });
+
+        marker.on('contextmenu', (ev) => {
+          L.DomEvent.stopPropagation(ev);
+          const next = drawingSegmentsRef.current
+            .map((seg, sIdx) => (sIdx === segIdx ? seg.filter((_, i) => i !== idx) : seg))
+            .filter((seg) => seg.length > 0);
+          onDrawingSegmentsChange?.(next);
+        });
+
+        marker.addTo(drawingLayer);
+
+        // Punto medio arrastrable (tipo Figma) para jalar/doblar cualquier segmento del tramo
+        if (idx < latLngs.length - 1) {
+          const nextPt = latLngs[idx + 1];
+          const midLat = (pt.lat + nextPt.lat) / 2;
+          const midLng = (pt.lng + nextPt.lng) / 2;
+
+          const midIcon = L.divIcon({
+            className: 'midpoint-marker',
+            html: `<div style="
+              width: 10px;
+              height: 10px;
+              background: rgba(255, 255, 255, 0.9);
+              border: 2px solid #0066ff;
+              border-radius: 50%;
+              opacity: 0.8;
+              cursor: copy;
+            "></div>`,
+            iconSize: [10, 10],
+            iconAnchor: [5, 5],
+          });
+
+          const midMarker = L.marker([midLat, midLng], {
+            icon: midIcon,
+            draggable: true,
+          });
+
+          midMarker.bindTooltip('Arrastra para jalar un nuevo vértice', {
+            direction: 'top',
+            className: 'optifiber-map-tooltip',
+          });
+
+          midMarker.on('dragend', (ev) => {
+            const pos = (ev.target as L.Marker).getLatLng();
+            const next = drawingSegmentsRef.current.map((seg, sIdx) => {
+              if (sIdx !== segIdx) return seg;
+              const updated = [...seg];
+              updated.splice(idx + 1, 0, [pos.lat, pos.lng]);
+              return updated;
+            });
+            onDrawingSegmentsChange?.(next);
+          });
+
+          midMarker.addTo(drawingLayer);
+        }
+      });
+    });
+  }, [drawingSegments, toolMode, onDrawingSegmentsChange, onToolModeChange]);
+
+  // 9. Manejo de Herramientas de Dibujo y Medición (Click, Clic derecho, Doble click)
   const handleMapClick = useCallback(
     (e: L.LeafletMouseEvent) => {
       if (toolMode === 'select') return;
 
-      const newPoint = e.latlng;
-      const updatedPoints = [...drawingPointsRef.current, newPoint];
-      setDrawingPoints(updatedPoints);
+      if (toolMode === 'add_nap') {
+        onMapClickForNap?.(e.latlng.lat, e.latlng.lng);
+        return;
+      }
 
-      const drawingLayer = drawingLayerRef.current;
-      drawingLayer.clearLayers();
-
-      // Marcadores temporales en cada vértice
-      updatedPoints.forEach((pt) => {
-        const vertexIcon = L.divIcon({
-          className: 'vertex-marker',
-          html: `<div style="
-            width: 10px;
-            height: 10px;
-            background: ${toolMode === 'measure' ? '#10b981' : '#0066ff'};
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            transform: translate(-50%, -50%);
-          "></div>`,
-          iconSize: [10, 10],
-          iconAnchor: [5, 5],
-        });
-        L.marker(pt, { icon: vertexIcon }).addTo(drawingLayer);
-      });
-
-      // Polilínea conectando los puntos
-      if (updatedPoints.length > 1) {
-        let totalDistanceMeters = 0;
-        for (let i = 0; i < updatedPoints.length - 1; i++) {
-          totalDistanceMeters += updatedPoints[i].distanceTo(updatedPoints[i + 1]);
-        }
-
-        const poly = L.polyline(updatedPoints, {
-          color: toolMode === 'measure' ? '#10b981' : '#0066ff',
-          weight: 4,
-          dashArray: toolMode === 'measure' ? '6, 6' : undefined,
-        }).addTo(drawingLayer);
-
-        // Tooltip en el último punto con la distancia acumulada
-        poly.bindTooltip(
-          `<strong>${toolMode === 'measure' ? 'Distancia' : 'Longitud'}:</strong> ${totalDistanceMeters.toFixed(1)} m`,
-          { permanent: true, direction: 'top', className: 'optifiber-map-tooltip' }
-        ).openTooltip(newPoint);
+      const current = drawingSegmentsRef.current;
+      const newPt: [number, number] = [e.latlng.lat, e.latlng.lng];
+      if (current.length === 0) {
+        onDrawingSegmentsChange?.([[newPt]]);
+      } else {
+        const lastIdx = current.length - 1;
+        const next = current.map((seg, i) => (i === lastIdx ? [...seg, newPt] : seg));
+        onDrawingSegmentsChange?.(next);
       }
     },
-    [toolMode]
+    [toolMode, onDrawingSegmentsChange, onMapClickForNap]
+  );
+
+  const handleMapContextMenu = useCallback(
+    (e: L.LeafletMouseEvent) => {
+      if (toolMode === 'select' || drawingSegmentsRef.current.length === 0) return;
+      L.DomEvent.preventDefault(e.originalEvent);
+      const current = drawingSegmentsRef.current;
+      const lastIdx = current.length - 1;
+      const next = current
+        .map((seg, i) => (i === lastIdx ? seg.slice(0, -1) : seg))
+        .filter((seg) => seg.length > 0);
+      onDrawingSegmentsChange?.(next);
+    },
+    [toolMode, onDrawingSegmentsChange]
   );
 
   // Manejo de doble clic para finalizar trazado
   const handleMapDoubleClick = useCallback(
     (e: L.LeafletMouseEvent) => {
       L.DomEvent.stopPropagation(e);
-      if (toolMode === 'draw_trunk' && drawingPointsRef.current.length >= 2) {
+      const validSegments = drawingSegmentsRef.current.filter((seg) => seg.length >= 2);
+      if (toolMode === 'draw_trunk' && validSegments.length > 0) {
         let totalDistanceMeters = 0;
-        const pts = drawingPointsRef.current;
-        for (let i = 0; i < pts.length - 1; i++) {
-          totalDistanceMeters += pts[i].distanceTo(pts[i + 1]);
-        }
-        const coords: Array<[number, number]> = pts.map((p) => [p.lat, p.lng]);
-        onTrunkDrawn?.(coords, Math.round(totalDistanceMeters * 10) / 10);
+        validSegments.forEach((seg) => {
+          for (let i = 0; i < seg.length - 1; i++) {
+            totalDistanceMeters += L.latLng(seg[i][0], seg[i][1]).distanceTo(
+              L.latLng(seg[i + 1][0], seg[i + 1][1])
+            );
+          }
+        });
+        onTrunkDrawn?.(validSegments, Math.round(totalDistanceMeters * 10) / 10);
       }
     },
     [toolMode, onTrunkDrawn]
@@ -540,22 +775,21 @@ export default function MapCanvas({
     if (toolMode !== 'select') {
       map.getContainer().style.cursor = 'crosshair';
       map.on('click', handleMapClick);
+      map.on('contextmenu', handleMapContextMenu);
       map.on('dblclick', handleMapDoubleClick);
     } else {
       map.getContainer().style.cursor = '';
       map.off('click', handleMapClick);
+      map.off('contextmenu', handleMapContextMenu);
       map.off('dblclick', handleMapDoubleClick);
-      // Limpiar capa de dibujo si volvemos a selección normal y no hay puntos pendientes
-      if (drawingPointsRef.current.length === 0) {
-        drawingLayerRef.current.clearLayers();
-      }
     }
 
     return () => {
       map.off('click', handleMapClick);
+      map.off('contextmenu', handleMapContextMenu);
       map.off('dblclick', handleMapDoubleClick);
     };
-  }, [toolMode, handleMapClick, handleMapDoubleClick]);
+  }, [toolMode, handleMapClick, handleMapContextMenu, handleMapDoubleClick]);
 
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
 

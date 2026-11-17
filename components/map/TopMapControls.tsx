@@ -11,6 +11,7 @@ import {
   MapPin,
   Maximize2,
   ChevronDown,
+  Square,
 } from 'lucide-react';
 import type { LayerVisibilityState, MapTileMode, MapZone } from '@/types/map';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ interface TopMapControlsProps {
   onSelectZone?: (zone: MapZone) => void;
   onFitAllBounds?: () => void;
   counts?: {
+    zonas?: number;
     naps: number;
     mufas: number;
     clientes: number;
@@ -43,7 +45,7 @@ export function TopMapControls({
   selectedZoneId,
   onSelectZone,
   onFitAllBounds,
-  counts = { naps: 12, mufas: 28, clientes: 186, troncales: 7, reservas: 3, alertas: 3 },
+  counts = { zonas: 0, naps: 12, mufas: 28, clientes: 186, troncales: 7, reservas: 3, alertas: 3 },
 }: TopMapControlsProps) {
   const layerButtons: Array<{
     key: keyof LayerVisibilityState;
@@ -52,6 +54,7 @@ export function TopMapControls({
     count: number;
     color: string;
   }> = [
+    { key: 'zonas', label: 'Zonas', icon: Square, count: counts.zonas ?? zones.length, color: 'text-[#6366f1]' },
     { key: 'naps', label: 'NAP', icon: Box, count: counts.naps, color: 'text-[#059669]' },
     { key: 'mufas', label: 'Mufas', icon: Layers, count: counts.mufas, color: 'text-[#d97706]' },
     { key: 'clientes', label: 'Clientes', icon: Users, count: counts.clientes, color: 'text-[#0066ff]' },

@@ -20,7 +20,7 @@ export const CustomerKpis: React.FC<CustomerKpisProps> = ({
     {
       title: 'Total Abonados',
       value: total,
-      subtitle: 'Red FTTH Chiclayo & Apurímac',
+      subtitle: 'Red FTTH activa',
       icon: <Users size={20} className="text-[#0066ff]" />,
       bg: 'bg-[#0066ff]/10',
     },

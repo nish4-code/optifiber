@@ -2,9 +2,21 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Plus, Minus, User } from 'lucide-react';
+import { ArrowUpRight, MapPin } from 'lucide-react';
 
-export function MiniMap() {
+interface MiniMapProps {
+  napsCount?: number;
+  closuresCount?: number;
+  customersCount?: number;
+}
+
+export function MiniMap({
+  napsCount = 0,
+  closuresCount = 0,
+  customersCount = 0,
+}: MiniMapProps) {
+  const totalNodes = napsCount + closuresCount + customersCount;
+
   return (
     <div className="bg-white border border-[#e2e8f0] rounded-[16px] shadow-[0px_1px_2px_rgba(0,0,0,0.05)] overflow-hidden">
       {/* Cabecera del Monitor */}
@@ -15,7 +27,7 @@ export function MiniMap() {
             <span className="relative inline-flex rounded-full h-[10px] w-[10px] bg-[#10b981]"></span>
           </span>
           <h3 className="text-[14px] font-semibold text-[#1e293b]">
-            Monitor Geográfico de Nodos (FTTH Chiclayo)
+            Monitor Geográfico de Nodos (Red FTTH)
           </h3>
           <span className="bg-[#f1f5f9] text-[#475569] text-[11px] font-medium px-[8px] py-[2px] rounded-[6px]">
             En vivo
@@ -31,9 +43,8 @@ export function MiniMap() {
         </Link>
       </div>
 
-      {/* Visor SVG Interactivo de Red */}
-      <div className="relative h-[320px] bg-[#121820] overflow-hidden select-none">
-        {/* Cuadrícula de Fondo */}
+      {/* Visor de Resumen Geográfico */}
+      <div className="relative h-[260px] bg-[#121820] overflow-hidden select-none flex items-center justify-center p-[24px]">
         <div
           className="absolute inset-0 opacity-15"
           style={{
@@ -43,143 +54,41 @@ export function MiniMap() {
           }}
         />
 
-        {/* Trazos de Fibra Óptica (SVG) */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
-          {/* Línea Troncal Principal (Línea 45 - Chiclayo Centro) */}
-          <path
-            d="M 60 180 Q 200 120 280 60 T 430 65 T 540 170"
-            stroke="#10b981"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            fill="none"
-          />
-          {/* Ramal de Distribución a Mufas */}
-          <path
-            d="M 280 60 L 280 200"
-            stroke="#0066ff"
-            strokeWidth="2.5"
-            strokeDasharray="4 2"
-            fill="none"
-          />
-          <path
-            d="M 430 65 L 480 135"
-            stroke="#0066ff"
-            strokeWidth="2.5"
-            strokeDasharray="4 2"
-            fill="none"
-          />
-          {/* Acometidas de Clientes */}
-          <path d="M 480 135 L 400 240" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="2 2" fill="none" />
-          <path d="M 480 135 L 480 130" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="2 2" fill="none" />
-          <path d="M 540 170 L 400 240" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="2 2" fill="none" />
-        </svg>
-
-        {/* Nodo NAP-04 */}
-        <div className="absolute top-[32px] left-[240px] bg-[#0f172a]/90 border border-[#34d399]/60 rounded-[8px] p-[6px] flex items-center gap-[8px] shadow-lg backdrop-blur-sm cursor-pointer hover:scale-105 transition-transform">
-          <div className="w-[24px] h-[24px] rounded-[6px] bg-[#10b981]/20 text-[#34d399] flex items-center justify-center text-[10px] font-bold">
-            NAP
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[11px] font-bold text-[#6ee7b7] leading-none">NAP-04</span>
-            <span className="text-[9px] text-[#94a3b8] leading-tight mt-[2px]">7/8 puertos</span>
-          </div>
-        </div>
-
-        {/* Nodo MUF-07 */}
-        <div className="absolute top-[40px] left-[400px] bg-[#0f172a]/90 border border-[#fbbf24]/60 rounded-[8px] p-[6px] flex items-center gap-[8px] shadow-lg backdrop-blur-sm cursor-pointer hover:scale-105 transition-transform">
-          <div className="w-[24px] h-[24px] rounded-[6px] bg-[#f59e0b]/20 text-[#fbbf24] flex items-center justify-center text-[10px] font-bold">
-            MUF
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[11px] font-bold text-[#fcd34d] leading-none">MUF-07</span>
-            <span className="text-[9px] text-[#94a3b8] leading-tight mt-[2px]">24 empalmes</span>
-          </div>
-        </div>
-
-        {/* Nodo NAP-05 */}
-        <div className="absolute top-[144px] left-[500px] bg-[#0f172a]/90 border border-[#34d399]/60 rounded-[8px] p-[6px] flex items-center gap-[8px] shadow-lg backdrop-blur-sm cursor-pointer hover:scale-105 transition-transform">
-          <div className="w-[24px] h-[24px] rounded-[6px] bg-[#10b981]/20 text-[#34d399] flex items-center justify-center text-[10px] font-bold">
-            NAP
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[11px] font-bold text-[#6ee7b7] leading-none">NAP-05</span>
-            <span className="text-[9px] text-[#94a3b8] leading-tight mt-[2px]">4/8 puertos</span>
-          </div>
-        </div>
-
-        {/* Nodo MUF-03 */}
-        <div className="absolute top-[176px] left-[240px] bg-[#0f172a]/90 border border-[#fbbf24]/60 rounded-[8px] p-[6px] flex items-center gap-[8px] shadow-lg backdrop-blur-sm cursor-pointer hover:scale-105 transition-transform">
-          <div className="w-[24px] h-[24px] rounded-[6px] bg-[#f59e0b]/20 text-[#fbbf24] flex items-center justify-center text-[10px] font-bold">
-            MUF
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[11px] font-bold text-[#fcd34d] leading-none">MUF-03</span>
-            <span className="text-[9px] text-[#94a3b8] leading-tight mt-[2px]">Ruta Bolognesi</span>
-          </div>
-        </div>
-
-        {/* Clientes Conectados */}
-        <div
-          className="absolute top-[112px] left-[450px] w-[24px] h-[24px] rounded-full bg-[#0066ff] border-2 border-white/60 flex items-center justify-center text-white shadow-md cursor-pointer hover:scale-110 transition-transform"
-          title="Cliente C-001 (Juan Pérez)"
-        >
-          <User className="w-[12px] h-[12px]" />
-        </div>
-
-        <div
-          className="absolute bottom-[40px] left-[380px] w-[24px] h-[24px] rounded-full bg-[#0066ff] border-2 border-white/60 flex items-center justify-center text-white shadow-md cursor-pointer hover:scale-110 transition-transform"
-          title="Cliente C-148 (María López)"
-        >
-          <User className="w-[12px] h-[12px]" />
-        </div>
-
-        {/* Controles de Zoom */}
-        <div className="absolute top-[12px] right-[12px] flex flex-col gap-[4px]">
-          <button
-            type="button"
-            className="w-[28px] h-[28px] bg-[#0f172a]/80 border border-[#334155] rounded-[4px] text-white flex items-center justify-center hover:bg-[#1e293b] cursor-pointer transition-colors"
-          >
-            <Plus className="w-[14px] h-[14px]" />
-          </button>
-          <button
-            type="button"
-            className="w-[28px] h-[28px] bg-[#0f172a]/80 border border-[#334155] rounded-[4px] text-white flex items-center justify-center hover:bg-[#1e293b] cursor-pointer transition-colors"
-          >
-            <Minus className="w-[14px] h-[14px]" />
-          </button>
-        </div>
-
-        {/* Mini Leyenda Flotante */}
-        <div className="absolute bottom-[12px] left-[12px] bg-[#0f172a]/80 border border-[#334155]/60 rounded-[8px] p-[10px] backdrop-blur-md flex flex-col gap-[6px]">
-          <div className="flex items-center gap-[12px]">
-            <div className="flex items-center gap-[6px]">
-              <span className="w-[8px] h-[8px] rounded-full bg-[#34d399]" />
-              <span className="text-[10px] text-[#cbd5e1]">Caja NAP</span>
+        {totalNodes === 0 ? (
+          <div className="relative z-10 flex flex-col items-center text-center gap-[10px] max-w-[360px]">
+            <div className="w-[42px] h-[42px] rounded-full bg-[#1e293b] border border-[#334155] flex items-center justify-center text-[#60a5fa]">
+              <MapPin className="w-[20px] h-[20px]" />
             </div>
-            <div className="flex items-center gap-[6px]">
-              <span className="w-[8px] h-[8px] rounded-full bg-[#fbbf24]" />
-              <span className="text-[10px] text-[#cbd5e1]">Mufa</span>
+            <p className="text-[14px] font-semibold text-white">
+              Sin nodos registrados en el mapa todavía
+            </p>
+            <p className="text-[12px] text-[#94a3b8]">
+              Abre el visor cartográfico GIS para delimitar zonas, trazar troncales de fibra y registrar cajas NAP o mufas.
+            </p>
+            <Link
+              href="/mapa"
+              className="mt-[4px] inline-flex items-center gap-[6px] px-[14px] py-[8px] rounded-[8px] bg-[#0066ff] hover:bg-[#0052cc] text-white text-[12px] font-semibold transition-colors"
+            >
+              <span>Ir al Mapa GIS</span>
+              <ArrowUpRight className="w-[14px] h-[14px]" />
+            </Link>
+          </div>
+        ) : (
+          <div className="relative z-10 grid grid-cols-3 gap-[16px] w-full max-w-[540px]">
+            <div className="bg-[#0f172a]/90 border border-[#34d399]/50 rounded-[12px] p-[16px] flex flex-col items-center gap-[4px] backdrop-blur-sm">
+              <span className="text-[24px] font-bold text-[#6ee7b7]">{napsCount}</span>
+              <span className="text-[11px] font-medium text-[#cbd5e1]">Cajas NAP</span>
             </div>
-            <div className="flex items-center gap-[6px]">
-              <span className="w-[8px] h-[8px] rounded-full bg-[#60a5fa]" />
-              <span className="text-[10px] text-[#cbd5e1]">Abonado</span>
+            <div className="bg-[#0f172a]/90 border border-[#fbbf24]/50 rounded-[12px] p-[16px] flex flex-col items-center gap-[4px] backdrop-blur-sm">
+              <span className="text-[24px] font-bold text-[#fcd34d]">{closuresCount}</span>
+              <span className="text-[11px] font-medium text-[#cbd5e1]">Mufas</span>
+            </div>
+            <div className="bg-[#0f172a]/90 border border-[#60a5fa]/50 rounded-[12px] p-[16px] flex flex-col items-center gap-[4px] backdrop-blur-sm">
+              <span className="text-[24px] font-bold text-[#93c5fd]">{customersCount}</span>
+              <span className="text-[11px] font-medium text-[#cbd5e1]">Abonados</span>
             </div>
           </div>
-          <div className="flex items-center gap-[12px] pt-[2px] border-t border-white/10">
-            <div className="flex items-center gap-[6px]">
-              <span className="w-[12px] h-[2px] bg-[#34d399]" />
-              <span className="text-[10px] text-[#94a3b8]">Troncal</span>
-            </div>
-            <div className="flex items-center gap-[6px]">
-              <span className="w-[12px] h-[2px] bg-[#0066ff]" />
-              <span className="text-[10px] text-[#94a3b8]">Distribución</span>
-            </div>
-            <div className="flex items-center gap-[6px]">
-              <span className="w-[12px] h-[2px] bg-[#fbbf24]" />
-              <span className="text-[10px] text-[#94a3b8]">Acometida</span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

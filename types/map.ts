@@ -1,12 +1,23 @@
+export type TrunkPath = Array<[number, number]> | Array<Array<[number, number]>>;
+
 export interface MapTrunk {
   id: number;
   code: string;
   name: string;
   fiber_count: number;
-  path: Array<[number, number]>; // [lat, lng]
+  path: TrunkPath; // [lat, lng][] o MultiPolyline [lat, lng][][]
   length_km: number;
   map_color: string;
   status: string;
+}
+
+export function normalizeTrunkSegments(path?: TrunkPath | null): Array<Array<[number, number]>> {
+  if (!Array.isArray(path) || path.length === 0) return [];
+  const first = path[0];
+  if (Array.isArray(first) && Array.isArray(first[0])) {
+    return (path as Array<Array<[number, number]>>).filter((seg) => Array.isArray(seg) && seg.length > 0);
+  }
+  return [path as Array<[number, number]>];
 }
 
 export interface FeederStrandInfo {
@@ -67,6 +78,7 @@ export interface MapElementsResponse {
 }
 
 export interface LayerVisibilityState {
+  zonas: boolean;
   naps: boolean;
   mufas: boolean;
   clientes: boolean;
@@ -82,6 +94,7 @@ export interface MapZone {
   description?: string;
   center_lat: number;
   center_lng: number;
+  polygon?: Array<[number, number]> | null;
   zoom_level?: number;
   city?: string;
   trunk_cables_count?: number;
@@ -91,4 +104,4 @@ export interface MapZone {
 }
 
 export type MapTileMode = 'map' | 'satellite';
-export type GisToolMode = 'select' | 'draw_trunk' | 'add_nap' | 'trace' | 'measure';
+export type GisToolMode = 'select' | 'draw_trunk' | 'draw_zone' | 'add_nap' | 'trace' | 'measure';

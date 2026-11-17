@@ -11,12 +11,16 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
+  RotateCw,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { apiClient } from '@/lib/api/client';
 import { PaginatedResponse } from '@/types/api';
+import { SmartOltOltItem } from '@/types/smartolt';
 
 interface FiberColorItem {
   id: number;
@@ -44,17 +48,19 @@ interface SmartOltOnuItem {
 
 export default function ConfiguracionPage() {
   const [colors, setColors] = useState<FiberColorItem[]>([]);
+  const [olts, setOlts] = useState<SmartOltOltItem[]>([]);
   const [onusData, setOnusData] = useState<PaginatedResponse<SmartOltOnuItem> | null>(null);
   const [loadingOnus, setLoadingOnus] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [actionOnuId, setActionOnuId] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Cargar colores TIA-598 reales del backend
+  // Cargar colores TIA-598 y OLTs reales del backend
   useEffect(() => {
     let isMounted = true;
     apiClient<FiberColorItem[]>('/fiber-colors')
@@ -62,6 +68,12 @@ export default function ConfiguracionPage() {
         if (isMounted && Array.isArray(res)) setColors(res);
       })
       .catch((err) => console.error('Error cargando colores TIA-598:', err));
+
+    apiClient<SmartOltOltItem[]>('/smartolt/olts')
+      .then((res) => {
+        if (isMounted && Array.isArray(res)) setOlts(res);
+      })
+      .catch((err) => console.error('Error cargando OLTs SmartOLT:', err));
 
     return () => {
       isMounted = false;
@@ -95,12 +107,13 @@ export default function ConfiguracionPage() {
     setSyncing(true);
     setSyncMessage(null);
     try {
-      const res = await apiClient<{ synced_olts?: number; synced_onus?: number; mode?: string }>(
+      const res = await apiClient<{ synced_olts?: number; olts_synced?: number; synced_onus?: number; onus_synced?: number; mode?: string }>(
         '/smartolt/sync',
         { method: 'POST' }
       );
+      const count = res?.onus_synced ?? res?.synced_onus ?? 0;
       setSyncMessage(
-        `Sincronización completada (${res?.mode || 'Mock/Local'}): ${res?.synced_onus ?? 0} ONUs actualizadas.`
+        `Sincronización completada (${res?.mode || 'Mock/Local'}): ${count} ONUs actualizadas.`
       );
       setLoadingOnus(true);
       setRefreshTrigger((prev) => prev + 1);
@@ -110,6 +123,27 @@ export default function ConfiguracionPage() {
       );
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleOnuAction = async (externalId: string, action: 'reboot' | 'enable' | 'disable') => {
+    setActionOnuId(externalId);
+    setSyncMessage(null);
+    try {
+      await apiClient(`/smartolt/onus/${externalId}/${action}`, { method: 'POST' });
+      const labels = {
+        reboot: 'Reinicio enviado a la ONU.',
+        enable: 'ONU habilitada en SmartOLT.',
+        disable: 'ONU suspendida en SmartOLT.',
+      };
+      setSyncMessage(labels[action]);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      setSyncMessage(
+        err instanceof Error ? err.message : 'No se pudo ejecutar la acción sobre la ONU.'
+      );
+    } finally {
+      setActionOnuId(null);
     }
   };
 
@@ -216,6 +250,36 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
+      {/* OLTs Registradas en SmartOLT */}
+      {olts.length > 0 && (
+        <div className="bg-white border border-[#e2e8f0] rounded-[12px] p-[16px] shadow-xs">
+          <div className="flex items-center justify-between mb-[12px]">
+            <h2 className="text-[14px] font-bold text-[#153b68]">
+              Cabeceras OLT Conectadas ({olts.length})
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[12px]">
+            {olts.map((olt) => (
+              <div
+                key={olt.id}
+                className="p-[12px] rounded-[8px] border border-[#e2e8f0] bg-[#f8fafc] flex flex-col gap-[4px]"
+              >
+                <div className="flex items-center justify-between gap-[6px]">
+                  <span className="text-[13px] font-bold text-[#0f172a] truncate">{olt.name}</span>
+                  <Badge variant={olt.status === 'online' || olt.status === 'Online' ? 'success' : 'warning'}>
+                    {olt.status || 'online'}
+                  </Badge>
+                </div>
+                <span className="text-[11px] font-mono text-[#64748b]">{olt.ip || 'IP N/A'}</span>
+                {olt.olt_hardware_version && (
+                  <span className="text-[11px] text-[#475569]">{olt.olt_hardware_version}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tabla de Monitoreo ONUs SmartOLT */}
       <div className="bg-white border border-[#e2e8f0] rounded-[12px] overflow-hidden shadow-xs flex flex-col">
         <div className="p-[16px] border-b border-[#f1f5f9] bg-[#f8fafc] flex flex-col md:flex-row items-start md:items-center justify-between gap-[12px]">
@@ -284,18 +348,19 @@ export default function ConfiguracionPage() {
                 <th className="py-[10px] px-[16px] font-bold">Señal Rx</th>
                 <th className="py-[10px] px-[16px] font-bold">Distancia</th>
                 <th className="py-[10px] px-[16px] font-bold">Estado</th>
+                <th className="py-[10px] px-[16px] font-bold text-right">Acciones OLT</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#f1f5f9] text-[13px] text-[#334155]">
               {loadingOnus ? (
                 <tr>
-                  <td colSpan={6} className="py-[32px] text-center text-[#64748b]">
+                  <td colSpan={7} className="py-[32px] text-center text-[#64748b]">
                     Cargando ONUs sincronizadas...
                   </td>
                 </tr>
               ) : !onusData || onusData.items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-[32px] text-center text-[#64748b]">
+                  <td colSpan={7} className="py-[32px] text-center text-[#64748b]">
                     No se encontraron ONUs en el espejo local.
                   </td>
                 </tr>
@@ -348,6 +413,47 @@ export default function ConfiguracionPage() {
                         >
                           {onu.status}
                         </Badge>
+                      </td>
+                      <td className="py-[12px] px-[16px] text-right">
+                        <div className="inline-flex items-center gap-[6px]">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={actionOnuId === onu.external_id}
+                            onClick={() => handleOnuAction(onu.external_id, 'reboot')}
+                            className="h-[26px] px-[8px] text-[11px] gap-[4px]"
+                            title="Reiniciar ONU"
+                          >
+                            <RotateCw
+                              size={11}
+                              className={actionOnuId === onu.external_id ? 'animate-spin' : ''}
+                            />
+                            Reboot
+                          </Button>
+                          {onu.status === 'Online' ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={actionOnuId === onu.external_id}
+                              onClick={() => handleOnuAction(onu.external_id, 'disable')}
+                              className="h-[26px] px-[8px] text-[11px] text-[#dc2626] border-[#fecaca] hover:bg-[#fef2f2]"
+                              title="Suspender ONU"
+                            >
+                              <PowerOff size={11} />
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={actionOnuId === onu.external_id}
+                              onClick={() => handleOnuAction(onu.external_id, 'enable')}
+                              className="h-[26px] px-[8px] text-[11px] text-[#16a34a] border-[#bbf7d0] hover:bg-[#f0fdf4]"
+                              title="Habilitar ONU"
+                            >
+                              <Power size={11} />
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

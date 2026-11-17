@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Bell, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
+import { apiClient } from '@/lib/api/client';
+import { DashboardSummary } from '@/types/dashboard';
 
 interface TopNavbarProps {
   averageAttenuation?: number;
@@ -11,14 +14,54 @@ interface TopNavbarProps {
 }
 
 export function TopNavbar({
-  averageAttenuation = -19.4,
-  oltBandwidth = 9.84,
-  alertsCount = 3,
+  averageAttenuation = 0,
+  oltBandwidth = 0,
+  alertsCount = 0,
 }: TopNavbarProps) {
+  const router = useRouter();
   const { user, logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [liveTelemetry, setLiveTelemetry] = useState<{
+    attenuation: number;
+    bandwidth: number;
+    alerts: number;
+  } | null>(null);
 
-  const displayName = user?.name || 'Jerzy Leon';
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+
+    apiClient<DashboardSummary>('/dashboard/summary')
+      .then((res) => {
+        if (!isMounted || !res?.telemetry) return;
+        setLiveTelemetry({
+          attenuation: Number(res.telemetry.average_attenuation_dbm ?? averageAttenuation),
+          bandwidth: Number(res.telemetry.olt_bandwidth_gbps ?? oltBandwidth),
+          alerts: Number(res.kpis?.active_alerts?.count ?? alertsCount),
+        });
+      })
+      .catch(() => {
+        // Mantiene valores por defecto si la telemetría aún no está disponible
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, averageAttenuation, oltBandwidth, alertsCount]);
+
+  const currentAttenuation = liveTelemetry?.attenuation ?? averageAttenuation;
+  const currentBandwidth = liveTelemetry?.bandwidth ?? oltBandwidth;
+  const currentAlerts = liveTelemetry?.alerts ?? alertsCount;
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    router.push(`/clientes?search=${encodeURIComponent(q)}`);
+  };
+
+  const displayName = user?.name || 'Usuario';
   const roleName = user?.role === 'admin' ? 'Administrador' : user?.role || 'Administrador';
   const initials = displayName
     .split(' ')
@@ -30,14 +73,16 @@ export function TopNavbar({
   return (
     <header className="h-[64px] bg-white border-b border-[#e2e8f0] px-[24px] flex items-center justify-between shadow-[0px_1px_2px_rgba(0,0,0,0.03)] shrink-0 sticky top-0 z-20">
       {/* Buscador Rápido */}
-      <div className="relative w-[340px]">
+      <form onSubmit={handleSearchSubmit} className="relative w-[340px]">
         <Search className="absolute left-[12px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-[#94a3b8]" />
         <input
           type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Buscar por código, dirección o nombre..."
           className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-[8px] pl-[38px] pr-[14px] py-[8px] text-[13px] text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0066ff]/20 focus:border-[#0066ff] transition-colors"
         />
-      </div>
+      </form>
 
       {/* Chips de Telemetría en Vivo */}
       <div className="flex items-center gap-[8px]">
@@ -46,7 +91,7 @@ export function TopNavbar({
             Atenuación Media
           </span>
           <span className="text-[14px] font-bold text-[#16a34a] leading-none">
-            {averageAttenuation > 0 ? `-${averageAttenuation}` : averageAttenuation} dBm
+            {currentAttenuation > 0 ? `-${currentAttenuation}` : currentAttenuation} dBm
           </span>
         </div>
 
@@ -55,7 +100,7 @@ export function TopNavbar({
             OLT
           </span>
           <span className="text-[14px] font-bold text-[#16a34a] leading-none">
-            {oltBandwidth} Gbps
+            {currentBandwidth} Gbps
           </span>
         </div>
       </div>
@@ -65,13 +110,14 @@ export function TopNavbar({
         {/* Campana de Notificaciones */}
         <button
           type="button"
+          onClick={() => router.push('/dashboard')}
           className="relative p-[8px] rounded-full text-[#64748b] hover:bg-[#f1f5f9] transition-colors cursor-pointer"
-          title={`${alertsCount} alertas activas`}
+          title={`${currentAlerts} alertas activas`}
         >
           <Bell className="w-[18px] h-[18px]" />
-          {alertsCount > 0 && (
+          {currentAlerts > 0 && (
             <span className="absolute top-[4px] right-[4px] w-[14px] h-[14px] bg-[#ef4444] text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
-              {alertsCount}
+              {currentAlerts}
             </span>
           )}
         </button>

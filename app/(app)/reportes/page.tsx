@@ -143,7 +143,7 @@ export default function ReportesPage() {
     }
   };
 
-  const avgRx = summary?.telemetry.average_attenuation_dbm ?? -19.4;
+  const avgRx = summary?.telemetry.average_attenuation_dbm ?? 0;
   const napOcc = summary?.kpis.naps.occupancy_percentage ?? 0;
   const activeCustomers = summary?.kpis.customers.active ?? 0;
   const totalCustomers = summary?.kpis.customers.total ?? 0;

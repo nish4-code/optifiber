@@ -8,44 +8,11 @@ interface LatestCustomersTableProps {
   totalCount?: number;
 }
 
-const defaultCustomers: LatestCustomerItem[] = [
-  {
-    id: 1,
-    code: 'C-001',
-    name: 'Juan Pérez García',
-    nap: 'NAP-04',
-    port: 'P1',
-    plan: '300 Mbps Fibra Simétrica',
-    status: 'activo',
-    installed_at: '2026-11-01',
-  },
-  {
-    id: 2,
-    code: 'C-148',
-    name: 'María López Torres',
-    nap: 'NAP-04',
-    port: 'P2',
-    plan: '500 Mbps Dúo Fibra',
-    status: 'activo',
-    installed_at: '2026-11-03',
-  },
-  {
-    id: 3,
-    code: 'C-004',
-    name: 'Ana Fernández Silva',
-    nap: 'NAP-04',
-    port: 'P4',
-    plan: '1 Gbps Corporativo Pro',
-    status: 'activo',
-    installed_at: '2026-11-05',
-  },
-];
-
 export function LatestCustomersTable({
-  customers = defaultCustomers,
-  totalCount = 186,
+  customers = [],
+  totalCount = 0,
 }: LatestCustomersTableProps) {
-  const displayCustomers = customers.length > 0 ? customers : defaultCustomers;
+  const displayCustomers = customers;
 
   return (
     <div className="bg-white border border-[#e2e8f0] rounded-[16px] shadow-[0px_1px_2px_rgba(0,0,0,0.05)] overflow-hidden">
@@ -76,7 +43,13 @@ export function LatestCustomersTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[#f1f5f9]">
-            {displayCustomers.map((c) => (
+            {displayCustomers.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-[24px] px-[16px] text-center text-[12px] text-[#64748b]">
+                  No hay clientes conectados aún.
+                </td>
+              </tr>
+            ) : displayCustomers.map((c) => (
               <tr key={c.id} className="hover:bg-[#f8fafc]/60 transition-colors">
                 <td className="py-[12px] px-[16px] font-semibold text-[#0f172a]">
                   {c.code}

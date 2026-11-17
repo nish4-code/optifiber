@@ -7,41 +7,8 @@ interface AlertListProps {
   alerts?: AlertItem[];
 }
 
-const defaultAlerts: AlertItem[] = [
-  {
-    id: 1,
-    title: 'NAP-04: Capacidad al 87%',
-    description:
-      'Queda sólo 1 puerto libre (7 de 8 asignados). Se requiere añadir splitter secundario.',
-    severity: 'critical',
-    type: 'capacidad_nap',
-    created_at: 'Hace 18 min',
-    resolved_at: null,
-  },
-  {
-    id: 2,
-    title: 'Mantenimiento en MUF-08',
-    description:
-      'Fusión de hilo de respaldo programada para las 15:00 hrs. Afectación temporal nula.',
-    severity: 'warning',
-    type: 'mantenimiento',
-    created_at: 'Hoy 15:00',
-    resolved_at: null,
-  },
-  {
-    id: 3,
-    title: 'Instalación Pendiente',
-    description:
-      'Jr. Bolognesi 458: Cliente solicita activación antes de las 18:00 hrs.',
-    severity: 'info',
-    type: 'acometida',
-    created_at: 'Asignada C-2',
-    resolved_at: null,
-  },
-];
-
-export function AlertList({ alerts = defaultAlerts }: AlertListProps) {
-  const displayAlerts = alerts.length > 0 ? alerts : defaultAlerts;
+export function AlertList({ alerts = [] }: AlertListProps) {
+  const displayAlerts = alerts;
 
   const severityStyles = {
     critical: {
@@ -93,7 +60,11 @@ export function AlertList({ alerts = defaultAlerts }: AlertListProps) {
 
       {/* Lista de Alertas */}
       <div className="flex flex-col gap-[10px]">
-        {displayAlerts.map((alert) => {
+        {displayAlerts.length === 0 ? (
+          <div className="py-[24px] text-center text-[12px] text-[#64748b] border border-dashed border-[#e2e8f0] rounded-[12px]">
+            Sin alertas activas en la red.
+          </div>
+        ) : displayAlerts.map((alert) => {
           const style =
             severityStyles[alert.severity as keyof typeof severityStyles] ||
             severityStyles.info;

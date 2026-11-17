@@ -67,17 +67,16 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
   useEffect(() => {
     if (!selectedNapId) {
-      setAvailablePorts([]);
       return;
     }
 
     let isMounted = true;
-    setLoadingPorts(true);
 
-    apiClient<NapPortItem[]>(`/naps/${selectedNapId}/ports`)
-      .then((ports) => {
+    apiClient<{ ports?: NapPortItem[] } | NapPortItem[]>(`/naps/${selectedNapId}/ports`)
+      .then((res) => {
         if (isMounted) {
-          setAvailablePorts(ports);
+          const list = Array.isArray(res) ? res : res?.ports || [];
+          setAvailablePorts(list);
         }
       })
       .catch((err) => {
@@ -254,6 +253,12 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
                     const id = e.target.value ? Number(e.target.value) : null;
                     setSelectedNapId(id);
                     setFormData({ ...formData, nap_port_id: null });
+                    if (!id) {
+                      setAvailablePorts([]);
+                      setLoadingPorts(false);
+                    } else {
+                      setLoadingPorts(true);
+                    }
                   }}
                   className="w-full h-[36px] px-[10px] text-[12px] text-[#334155] bg-white border border-[#cbd5e1] rounded-[6px] cursor-pointer"
                 >

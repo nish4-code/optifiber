@@ -13,6 +13,8 @@ interface ZoneFormModalProps {
   onClose: () => void;
   onSaved: () => void;
   zoneToEdit?: MapZone | null;
+  initialCenter?: { lat: number; lng: number } | null;
+  initialPolygon?: Array<[number, number]> | null;
 }
 
 export const ZoneFormModal: React.FC<ZoneFormModalProps> = ({
@@ -20,12 +22,19 @@ export const ZoneFormModal: React.FC<ZoneFormModalProps> = ({
   onClose,
   onSaved,
   zoneToEdit,
+  initialCenter,
+  initialPolygon,
 }) => {
   const [code, setCode] = useState(zoneToEdit?.code || '');
   const [name, setName] = useState(zoneToEdit?.name || '');
   const [description, setDescription] = useState(zoneToEdit?.description || '');
-  const [centerLat, setCenterLat] = useState<number>(zoneToEdit?.center_lat ?? -6.7725);
-  const [centerLng, setCenterLng] = useState<number>(zoneToEdit?.center_lng ?? -79.8402);
+  const [centerLat, setCenterLat] = useState<number>(
+    zoneToEdit?.center_lat ?? initialCenter?.lat ?? -13.6339
+  );
+  const [centerLng, setCenterLng] = useState<number>(
+    zoneToEdit?.center_lng ?? initialCenter?.lng ?? -72.8814
+  );
+  const polygon = initialPolygon ?? zoneToEdit?.polygon ?? null;
 
   const [saving, setSaving] = useState(false);
   const [geoLocating, setGeoLocating] = useState(false);
@@ -69,6 +78,7 @@ export const ZoneFormModal: React.FC<ZoneFormModalProps> = ({
         description,
         center_lat: centerLat,
         center_lng: centerLng,
+        polygon,
       };
 
       if (zoneToEdit) {
@@ -215,6 +225,12 @@ export const ZoneFormModal: React.FC<ZoneFormModalProps> = ({
             </div>
           </div>
         </div>
+        {polygon && polygon.length >= 3 && (
+          <div className="p-[10px] rounded-[8px] bg-[#f5f3ff] border border-[#ddd6fe] text-[#5b21b6] text-[12px] font-medium flex items-center justify-between">
+            <span>Polígono geográfico delimitado en mapa</span>
+            <span className="font-mono text-[11px] font-bold">{polygon.length} vértices</span>
+          </div>
+        )}
       </form>
     </SlideOverDrawer>
   );

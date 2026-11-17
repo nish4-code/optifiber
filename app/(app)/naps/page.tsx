@@ -108,7 +108,7 @@ export default function NapsPage() {
             </span>
           </h1>
           <p className="text-[13px] text-[#64748b]">
-            Monitoreo, capacidad y asignación de splitters ópticos 1:8 y 1:16 en Chiclayo y Apurímac.
+            Monitoreo, capacidad y asignación de splitters ópticos 1:8 y 1:16 en la red FTTH.
           </p>
         </div>
 

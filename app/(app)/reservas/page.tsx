@@ -136,8 +136,8 @@ export default function ReservasPage() {
                 type: 'reserva',
                 mount_type: 'poste',
                 fiber_capacity: 144,
-                latitude: -6.7725,
-                longitude: -79.8415,
+                latitude: -13.6339,
+                longitude: -72.8814,
                 reserve_meters: 25,
                 status: 'activo',
               });

@@ -7,35 +7,8 @@ interface ZoneCapacityProps {
   totalPorts?: number;
 }
 
-const defaultZones: ZoneCapacityItem[] = [
-  {
-    id: 1,
-    name: 'Zona 1: Jr. Bolognesi (NAP-01 a NAP-04)',
-    total_ports: 32,
-    occupied_ports: 27,
-    free_ports: 5,
-    occupancy_percentage: 84.4,
-  },
-  {
-    id: 2,
-    name: 'Zona 2: Av. Balta (NAP-05 a NAP-08)',
-    total_ports: 32,
-    occupied_ports: 18,
-    free_ports: 14,
-    occupancy_percentage: 56.2,
-  },
-  {
-    id: 3,
-    name: 'Zona 3: San José - Sáenz Peña (NAP-09 a NAP-12)',
-    total_ports: 32,
-    occupied_ports: 21,
-    free_ports: 11,
-    occupancy_percentage: 65.6,
-  },
-];
-
-export function ZoneCapacity({ zones = defaultZones, totalPorts = 96 }: ZoneCapacityProps) {
-  const displayZones = zones.length > 0 ? zones : defaultZones;
+export function ZoneCapacity({ zones = [], totalPorts = 0 }: ZoneCapacityProps) {
+  const displayZones = zones;
   const calculatedTotal = zones.reduce((acc, z) => acc + z.total_ports, 0) || totalPorts;
 
   return (
@@ -57,7 +30,11 @@ export function ZoneCapacity({ zones = defaultZones, totalPorts = 96 }: ZoneCapa
 
       {/* Lista de Barras de Distribución */}
       <div className="flex flex-col gap-[14px]">
-        {displayZones.map((zone) => {
+        {displayZones.length === 0 ? (
+          <div className="py-[20px] text-center text-[12px] text-[#64748b] border border-dashed border-[#e2e8f0] rounded-[12px]">
+            No hay zonas con cajas NAP registradas aún.
+          </div>
+        ) : displayZones.map((zone) => {
           const pct = Math.round(zone.occupancy_percentage);
           const isHigh = pct >= 80;
           const isMedium = pct >= 60 && pct < 80;

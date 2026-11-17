@@ -13,11 +13,16 @@ import {
   Calendar,
   Activity,
   RefreshCw,
+  Power,
+  PowerOff,
+  RotateCw,
+  GitMerge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { apiClient } from '@/lib/api/client';
 import { CustomerDetailDto } from '@/types/customers';
+import { SmartOltTraceDto } from '@/types/smartolt';
 
 interface CustomerDrawerProps {
   customerId: number | null;
@@ -35,6 +40,9 @@ export const CustomerDrawer: React.FC<CustomerDrawerProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [updatingSignal, setUpdatingSignal] = useState<boolean>(false);
   const [signalMessage, setSignalMessage] = useState<string | null>(null);
+  const [onuActionLoading, setOnuActionLoading] = useState<'reboot' | 'enable' | 'disable' | null>(null);
+  const [traceData, setTraceData] = useState<SmartOltTraceDto | null>(null);
+  const [loadingTrace, setLoadingTrace] = useState<boolean>(false);
 
   useEffect(() => {
     if (!customerId) return;
@@ -43,7 +51,12 @@ export const CustomerDrawer: React.FC<CustomerDrawerProps> = ({
 
     apiClient<CustomerDetailDto>(`/customers/${customerId}`)
       .then((res) => {
-        if (isMounted) setDetail(res);
+        if (isMounted) {
+          setDetail(res);
+          setTraceData(null);
+          setSignalMessage(null);
+          setActiveTab('info');
+        }
       })
       .catch((err) => {
         console.error('Error cargando ficha del cliente:', err);
@@ -91,6 +104,51 @@ export const CustomerDrawer: React.FC<CustomerDrawerProps> = ({
       setSignalMessage('No se pudo conectar con la OLT.');
     } finally {
       setUpdatingSignal(false);
+    }
+  };
+
+  const handleOnuAction = async (action: 'reboot' | 'enable' | 'disable') => {
+    if (!detail?.equipment?.external_id) return;
+
+    setOnuActionLoading(action);
+    setSignalMessage(null);
+
+    try {
+      await apiClient(`/smartolt/onus/${detail.equipment.external_id}/${action}`, {
+        method: 'POST',
+      });
+
+      const messages = {
+        reboot: 'Comando de reinicio enviado a la ONT.',
+        enable: 'ONT habilitada en la OLT.',
+        disable: 'ONT deshabilitada en la OLT.',
+      };
+      setSignalMessage(messages[action]);
+      onRefreshList?.();
+    } catch (err) {
+      setSignalMessage(
+        err instanceof Error ? err.message : 'No se pudo ejecutar la acción en SmartOLT.'
+      );
+    } finally {
+      setOnuActionLoading(null);
+    }
+  };
+
+  const handleLoadTrace = async () => {
+    if (!detail?.equipment?.external_id) return;
+
+    setLoadingTrace(true);
+    try {
+      const res = await apiClient<SmartOltTraceDto>(
+        `/smartolt/onus/${detail.equipment.external_id}/trace`
+      );
+      setTraceData(res);
+    } catch (err) {
+      setSignalMessage(
+        err instanceof Error ? err.message : 'No se pudo obtener el trazado óptico.'
+      );
+    } finally {
+      setLoadingTrace(false);
     }
   };
 
@@ -383,6 +441,88 @@ export const CustomerDrawer: React.FC<CustomerDrawerProps> = ({
                         {detail.equipment.distance_m && (
                           <div className="text-[11px] text-[#64748b]">
                             Distancia física a la central OLT: <strong>{detail.equipment.distance_m} metros</strong>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Acciones Remotas SmartOLT */}
+                      <div className="p-[14px] rounded-[10px] border border-[#e2e8f0] bg-white flex flex-col gap-[10px]">
+                        <span className="text-[12px] font-bold text-[#0f172a]">
+                          Control Remoto OLT
+                        </span>
+                        <div className="grid grid-cols-3 gap-[8px]">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOnuAction('reboot')}
+                            disabled={onuActionLoading !== null}
+                            className="h-[32px] text-[11px] gap-[4px]"
+                          >
+                            <RotateCw
+                              size={12}
+                              className={onuActionLoading === 'reboot' ? 'animate-spin' : ''}
+                            />
+                            Reiniciar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOnuAction('enable')}
+                            disabled={onuActionLoading !== null}
+                            className="h-[32px] text-[11px] gap-[4px] text-[#16a34a] border-[#bbf7d0] hover:bg-[#f0fdf4]"
+                          >
+                            <Power size={12} />
+                            Habilitar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOnuAction('disable')}
+                            disabled={onuActionLoading !== null}
+                            className="h-[32px] text-[11px] gap-[4px] text-[#dc2626] border-[#fecaca] hover:bg-[#fef2f2]"
+                          >
+                            <PowerOff size={12} />
+                            Suspender
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Trazado Óptico SmartOLT */}
+                      <div className="p-[14px] rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] flex flex-col gap-[10px]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[12px] font-bold text-[#0f172a] flex items-center gap-[6px]">
+                            <GitMerge size={14} className="text-[#0066ff]" />
+                            Trazado Óptico (OLT → ODB → ONU)
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleLoadTrace}
+                            disabled={loadingTrace}
+                            className="h-[28px] px-[8px] text-[11px] bg-white"
+                          >
+                            {loadingTrace ? 'Trazando...' : traceData ? 'Actualizar' : 'Consultar Ruta'}
+                          </Button>
+                        </div>
+
+                        {traceData && traceData.hops.length > 0 && (
+                          <div className="flex flex-col gap-[6px]">
+                            {traceData.hops.map((hop, idx) => (
+                              <div
+                                key={`${hop.type}-${hop.id}-${idx}`}
+                                className="flex items-center justify-between bg-white px-[10px] py-[8px] rounded-[6px] border border-[#e2e8f0] text-[12px]"
+                              >
+                                <div className="flex items-center gap-[8px]">
+                                  <Badge variant={hop.type === 'olt' ? 'blue' : hop.type === 'odb' ? 'warning' : 'success'}>
+                                    {hop.type.toUpperCase()}
+                                  </Badge>
+                                  <span className="font-semibold text-[#0f172a]">{hop.label}</span>
+                                </div>
+                                <span className="text-[11px] font-mono text-[#64748b]">
+                                  {hop.type === 'olt' && hop.board ? `Slot ${hop.board}/${hop.port}` : hop.zone || hop.status || ''}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

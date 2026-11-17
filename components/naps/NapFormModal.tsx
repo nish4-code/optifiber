@@ -15,6 +15,7 @@ interface NapFormModalProps {
   onSaved: () => void;
   napToEdit?: NapItem | null;
   zones: ZoneOption[];
+  initialCoordinates?: { latitude: number; longitude: number } | null;
 }
 
 export const NapFormModal: React.FC<NapFormModalProps> = ({
@@ -23,6 +24,7 @@ export const NapFormModal: React.FC<NapFormModalProps> = ({
   onSaved,
   napToEdit,
   zones,
+  initialCoordinates,
 }) => {
   const [formData, setFormData] = useState<NapFormData>({
     zone_id: napToEdit?.zone?.id || (zones[0]?.id ?? null),
@@ -30,8 +32,8 @@ export const NapFormModal: React.FC<NapFormModalProps> = ({
     name: napToEdit?.name || '',
     splitter_ratio: napToEdit?.splitter_ratio || '1:8',
     address: napToEdit?.address || '',
-    latitude: napToEdit?.latitude || -6.7725,
-    longitude: napToEdit?.longitude || -79.8415,
+    latitude: napToEdit?.latitude ?? initialCoordinates?.latitude ?? -13.6339,
+    longitude: napToEdit?.longitude ?? initialCoordinates?.longitude ?? -72.8814,
     status: napToEdit?.status || 'activo',
     notes: napToEdit?.notes || '',
   });

@@ -1,19 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
-import { GitBranch, ChevronDown, ChevronUp, Navigation } from 'lucide-react';
+import { GitBranch, ChevronDown, ChevronUp, Navigation, PenTool, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import type { MapTrunk } from '@/types/map';
 
 interface BottomTramosTableProps {
   trunks: MapTrunk[];
   onSelectTrunk?: (trunk: MapTrunk) => void;
+  onEditTrunk?: (trunk: MapTrunk) => void;
+  onDeleteTrunk?: (trunk: MapTrunk) => void;
   selectedTrunkId?: number | null;
 }
 
 export function BottomTramosTable({
   trunks,
   onSelectTrunk,
+  onEditTrunk,
+  onDeleteTrunk,
   selectedTrunkId,
 }: BottomTramosTableProps) {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -105,15 +109,38 @@ export function BottomTramosTable({
                       </Badge>
                     </td>
                     <td className="py-[8px] px-[12px] text-right">
-                      <button
-                        type="button"
-                        onClick={() => onSelectTrunk?.(trunk)}
-                        className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[4px] bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#153b68] text-[11px] font-medium transition-colors cursor-pointer"
-                        title="Centrar tramo en mapa"
-                      >
-                        <Navigation className="w-[11px] h-[11px]" />
-                        <span>Ver</span>
-                      </button>
+                      <div className="inline-flex items-center gap-[6px]">
+                        <button
+                          type="button"
+                          onClick={() => onSelectTrunk?.(trunk)}
+                          className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[4px] bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#153b68] text-[11px] font-medium transition-colors cursor-pointer"
+                          title="Centrar tramo en mapa"
+                        >
+                          <Navigation className="w-[11px] h-[11px]" />
+                          <span>Ver</span>
+                        </button>
+                        {onEditTrunk && (
+                          <button
+                            type="button"
+                            onClick={() => onEditTrunk(trunk)}
+                            className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[4px] bg-[#eff6ff] hover:bg-[#dbeafe] text-[#0066ff] text-[11px] font-medium transition-colors cursor-pointer"
+                            title="Retomar / extender trazado del tramo"
+                          >
+                            <PenTool className="w-[11px] h-[11px]" />
+                            <span>Extender</span>
+                          </button>
+                        )}
+                        {onDeleteTrunk && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteTrunk(trunk)}
+                            className="inline-flex items-center justify-center p-[4px] rounded-[4px] bg-[#fef2f2] hover:bg-[#fee2e2] text-[#dc2626] transition-colors cursor-pointer"
+                            title="Eliminar tramo"
+                          >
+                            <Trash2 className="w-[12px] h-[12px]" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
